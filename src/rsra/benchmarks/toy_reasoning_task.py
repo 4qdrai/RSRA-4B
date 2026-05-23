@@ -205,11 +205,11 @@ def _generate_random_constraint(
     return Constraint(op=op, variables=variables, negated=negated)
 
 
-def _solve_csp_bruteforce(
+def _solve_csp_backtracking(
     n_vars: int,
     constraints: list[Constraint],
 ) -> tuple[bool, dict[int, bool] | None]:
-    """Solve a CSP by brute-force enumeration.
+    """Solve a CSP using backtracking search with early pruning.
 
     Parameters
     ----------
@@ -222,15 +222,46 @@ def _solve_csp_bruteforce(
     -------
     tuple[bool, dict[int, bool] | None]
         ``(is_satisfiable, assignment_or_None)``
-
-    Notes
-    -----
-    Complexity is O(2^n_vars * K).  Only use for n_vars ≤ 20.
     """
-    for bits in itertools.product([False, True], repeat=n_vars):
-        assignment = {i: bits[i] for i in range(n_vars)}
-        if all(c.evaluate(assignment) for c in constraints):
-            return True, assignment
+    # Group constraints by the maximum variable index they contain.
+    # This allows us to check a constraint as soon as all its variables are assigned.
+    constraints_by_max_var = [[] for _ in range(n_vars)]
+    for c in constraints:
+        if c.variables:
+            max_v = max(c.variables)
+            if max_v < n_vars:
+                constraints_by_max_var[max_v].append(c)
+            else:
+                constraints_by_max_var[-1].append(c)
+        else:
+            constraints_by_max_var[0].append(c)
+
+    assignment = {}
+
+    def backtrack(var_idx: int) -> bool:
+        if var_idx == n_vars:
+            return True
+
+        for val in (False, True):
+            assignment[var_idx] = val
+
+            # Check all constraints that become fully assigned at this step
+            conflict = False
+            for c in constraints_by_max_var[var_idx]:
+                if not c.evaluate(assignment):
+                    conflict = True
+                    break
+
+            if not conflict:
+                if backtrack(var_idx + 1):
+                    return True
+
+        if var_idx in assignment:
+            del assignment[var_idx]
+        return False
+
+    if backtrack(0):
+        return True, assignment.copy()
     return False, None
 
 
@@ -251,7 +282,7 @@ def generate_csp(
     rng : random.Random
         Random generator for reproducibility.
     max_solve_vars : int
-        Maximum N for brute-force solving.  If ``n_vars`` exceeds
+        Maximum N for exact solving. If ``n_vars`` exceeds
         this, satisfiability is set to True heuristically.
 
     Returns
@@ -265,7 +296,7 @@ def generate_csp(
     ]
 
     if n_vars <= max_solve_vars:
-        sat, assignment = _solve_csp_bruteforce(n_vars, constraints)
+        sat, assignment = _solve_csp_backtracking(n_vars, constraints)
     else:
         # For large N, heuristic: try random assignments
         sat = False
