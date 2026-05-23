@@ -129,12 +129,11 @@ def train_one_epoch_variable_iters(
     total_loss = 0.0
     total_iters = 0.0
     n_batches = 0
-    criterion = nn.BCEWithLogitsLoss()
+    criterion = nn.BCELoss()
 
-    for batch in loader:
-        token_ids = batch["token_ids"].to(device)
-        labels = batch["label"].to(device).unsqueeze(1)
-        mask = batch["mask"].to(device)
+    for token_ids, labels, _ in loader:
+        token_ids = token_ids.to(device)
+        labels = labels.to(device)
 
         # === Variable Iteration Training ===
         # Randomly sample max_iterations for this batch
@@ -144,12 +143,7 @@ def train_one_epoch_variable_iters(
 
         logits, iters, scores = model(token_ids)
 
-        # Compute loss only on active (non-padded) samples
-        active = mask.any(dim=1)
-        if active.any():
-            loss = criterion(logits[active], labels[active])
-        else:
-            continue
+        loss = criterion(logits, labels)
 
         optimizer.zero_grad()
         loss.backward()
@@ -175,20 +169,15 @@ def train_one_epoch_baseline(
     model.train()
     total_loss = 0.0
     n_batches = 0
-    criterion = nn.BCEWithLogitsLoss()
+    criterion = nn.BCELoss()
 
-    for batch in loader:
-        token_ids = batch["token_ids"].to(device)
-        labels = batch["label"].to(device).unsqueeze(1)
-        mask = batch["mask"].to(device)
+    for token_ids, labels, _ in loader:
+        token_ids = token_ids.to(device)
+        labels = labels.to(device)
 
         logits = model(token_ids)
 
-        active = mask.any(dim=1)
-        if active.any():
-            loss = criterion(logits[active], labels[active])
-        else:
-            continue
+        loss = criterion(logits, labels)
 
         optimizer.zero_grad()
         loss.backward()
@@ -215,11 +204,11 @@ def evaluate(
     total_loss = 0.0
     total_iters = 0.0
     n_batches = 0
-    criterion = nn.BCEWithLogitsLoss()
+    criterion = nn.BCELoss()
 
-    for batch in loader:
-        token_ids = batch["token_ids"].to(device)
-        labels = batch["label"].to(device).unsqueeze(1)
+    for token_ids, labels, _ in loader:
+        token_ids = token_ids.to(device)
+        labels = labels.to(device)
 
         if is_rsra:
             logits, iters, _ = model(token_ids)
@@ -230,7 +219,7 @@ def evaluate(
         loss = criterion(logits, labels)
         total_loss += loss.item()
 
-        preds = (logits > 0).float()
+        preds = (logits > 0.5).float()
         correct += (preds == labels).sum().item()
         total += labels.size(0)
         n_batches += 1
