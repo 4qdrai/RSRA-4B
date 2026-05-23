@@ -212,7 +212,15 @@ class RSRABlock(nn.Module):
             iters = k + 1
 
             # 3. Accept or refine
-            mean_score = v.mean().item()
+            if key_padding_mask is not None:
+                # key_padding_mask has True for padding positions (shape: B, S)
+                active_mask = ~key_padding_mask  # True for active positions
+                active_mask = active_mask.unsqueeze(-1)  # (B, S, 1)
+                active_v = v[active_mask]
+                mean_score = active_v.mean().item() if active_v.numel() > 0 else 0.0
+            else:
+                mean_score = v.mean().item()
+
             if mean_score >= self.config.tau:
                 accepted = True
                 if not self.training:
