@@ -168,11 +168,13 @@ class BaselineTransformer(nn.Module):
         # Encode
         h = self.encoder(x, src_key_padding_mask=pad_mask)
 
-        # Mean-pool over non-padding positions
-        active_mask = (~pad_mask).unsqueeze(-1).float()
-        h_masked = h * active_mask
-        lengths = active_mask.sum(dim=1).clamp(min=1)
-        pooled = h_masked.sum(dim=1) / lengths  # (B, d_model)
+        # Query-token pooling: extract the last non-pad token representation
+        # (the '?' token which has attended to all rule context)
+        active_mask = (~pad_mask)  # (B, S) True = active
+        lengths = active_mask.sum(dim=1)  # (B,)
+        last_idx = (lengths - 1).clamp(min=0)  # (B,)
+        gather_idx = last_idx.unsqueeze(1).unsqueeze(2).expand(-1, 1, h.size(-1))  # (B, 1, D)
+        pooled = torch.gather(h, dim=1, index=gather_idx).squeeze(1)  # (B, D)
 
         return self.classifier(pooled)  # (B, 1)
 

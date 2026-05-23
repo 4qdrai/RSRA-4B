@@ -63,29 +63,31 @@ COLOR_GEMINI = "#3498DB"    # Blue
 
 @dataclass
 class CollapseConfig:
-    d_model: int = 64
+    d_model: int = 128
     n_heads: int = 4
-    d_ff: int = 128
+    d_ff: int = 256
     rsra_max_iterations: int = 3
-    rsra_tau: float = 0.65
-    baseline_n_layers: int = 2
-    n_train: int = 4000
-    n_val: int = 400
-    n_test_per_n: int = 200
-    train_n_range: tuple[int, int] = (2, 3)
+    rsra_tau: float = 0.95
+    baseline_n_layers: int = 4
+    n_train: int = 10000
+    n_val: int = 1000
+    n_test_per_n: int = 400
+    train_n_range: tuple[int, int] = (2, 4)  # Train on N=2,3,4 to learn general chaining
     eval_n_values: list[int] = None
-    n_epochs: int = 20
+    n_epochs: int = 30
     batch_size: int = 64
-    lr: float = 1e-3
+    lr: float = 3e-4
     seed: int = 42
-    max_seq_len: int = 96
-    max_vars: int = 40
+    max_seq_len: int = 96   # Longer to accommodate more variables
+    max_vars: int = 20      # x0-x19: large enough to prevent memorization
+    n_distractors: int = 0 # Zero distractors during training (pure signal)
+    eval_n_distractors: int = 0  # Match training: test pure chain length extrapolation
     figures_dir: str = "figures"
     docs_dir: str = "docs"
 
     def __post_init__(self) -> None:
         if self.eval_n_values is None:
-            self.eval_n_values = [2, 4, 6, 8, 10, 12]
+            self.eval_n_values = [2, 3, 4, 5, 6, 7, 8]
 
 
 # ======================================================================
@@ -201,10 +203,10 @@ def run_collapse_benchmark(config: CollapseConfig | None = None) -> dict[str, An
     torch.manual_seed(config.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    print("=" * 64)
-    print("  TRLC STRUCTURAL COLLAPSE BENCHMARK  ")
-    print("=" * 64)
-    print(f"Device: {device}")
+    print("=" * 64, flush=True)
+    print("  TRLC STRUCTURAL COLLAPSE BENCHMARK  ", flush=True)
+    print("=" * 64, flush=True)
+    print(f"Device: {device}", flush=True)
 
     # Create directories
     os.makedirs(config.figures_dir, exist_ok=True)
@@ -218,6 +220,7 @@ def run_collapse_benchmark(config: CollapseConfig | None = None) -> dict[str, An
         size=config.n_train,
         n_range=config.train_n_range,
         max_vars=config.max_vars,
+        n_distractors=config.n_distractors,
         max_seq_len=config.max_seq_len,
         seed=config.seed,
         tokenizer=tokenizer,
@@ -226,6 +229,7 @@ def run_collapse_benchmark(config: CollapseConfig | None = None) -> dict[str, An
         size=config.n_val,
         n_range=config.train_n_range,
         max_vars=config.max_vars,
+        n_distractors=config.n_distractors,
         max_seq_len=config.max_seq_len,
         seed=config.seed + 1,
         tokenizer=tokenizer,
@@ -234,8 +238,8 @@ def run_collapse_benchmark(config: CollapseConfig | None = None) -> dict[str, An
     train_loader = DataLoader(train_ds, batch_size=config.batch_size, shuffle=True)
     val_loader = DataLoader(val_ds, batch_size=config.batch_size, shuffle=False)
 
-    print(f"  Training set size  : {len(train_ds)} (N in {config.train_n_range})")
-    print(f"  Validation set size: {len(val_ds)}")
+    print(f"  Training set size  : {len(train_ds)} (N in {config.train_n_range})", flush=True)
+    print(f"  Validation set size: {len(val_ds)}", flush=True)
 
     # 2. Build Models
     print("\n[2/6] Instantiating models...")
@@ -270,10 +274,10 @@ def run_collapse_benchmark(config: CollapseConfig | None = None) -> dict[str, An
         pad_id=tokenizer.pad_id,
     ).to(device)
 
-    print(f"  Baseline parameters: {baseline_model.count_parameters():,}")
+    print(f"  Baseline parameters: {baseline_model.count_parameters():,}", flush=True)
     # Parameter count helper for RSRA
     rsra_params = sum(p.numel() for p in rsra_model.parameters() if p.requires_grad)
-    print(f"  RSRA-4B parameters : {rsra_params:,} (equivalent or smaller!)")
+    print(f"  RSRA-4B parameters : {rsra_params:,} (equivalent or smaller!)", flush=True)
 
     # 3. Train Models
     print("\n[3/6] Training models...")
@@ -286,7 +290,7 @@ def run_collapse_benchmark(config: CollapseConfig | None = None) -> dict[str, An
         train_loss = train_one_epoch(baseline_model, train_loader, base_opt, device, is_rsra=False)
         _, val_acc, _ = evaluate_model(baseline_model, val_loader, device, is_rsra=False)
         if (epoch + 1) % 5 == 0:
-            print(f"    Epoch {epoch+1:02d}/{config.n_epochs:02d} | Train Loss: {train_loss:.4f} | Val Acc: {val_acc:.1%}")
+            print(f"    Epoch {epoch+1:02d}/{config.n_epochs:02d} | Train Loss: {train_loss:.4f} | Val Acc: {val_acc:.1%}", flush=True)
     base_time = time.time() - t0
 
     # Train RSRA-4B
@@ -297,7 +301,7 @@ def run_collapse_benchmark(config: CollapseConfig | None = None) -> dict[str, An
         train_loss = train_one_epoch(rsra_model, train_loader, rsra_opt, device, is_rsra=True)
         _, val_acc, val_iters = evaluate_model(rsra_model, val_loader, device, is_rsra=True)
         if (epoch + 1) % 5 == 0:
-            print(f"    Epoch {epoch+1:02d}/{config.n_epochs:02d} | Train Loss: {train_loss:.4f} | Val Acc: {val_acc:.1%} | Avg Iters: {val_iters:.2f}")
+            print(f"    Epoch {epoch+1:02d}/{config.n_epochs:02d} | Train Loss: {train_loss:.4f} | Val Acc: {val_acc:.1%} | Avg Iters: {val_iters:.2f}", flush=True)
     rsra_time = time.time() - t0
 
     # 4. Deep Extrapolation Evaluation by N
@@ -316,6 +320,7 @@ def run_collapse_benchmark(config: CollapseConfig | None = None) -> dict[str, An
             size=config.n_test_per_n,
             n_range=(n, n),
             max_vars=config.max_vars,
+            n_distractors=config.eval_n_distractors,
             max_seq_len=config.max_seq_len,
             seed=config.seed + 100 + n,
             tokenizer=tokenizer,
@@ -328,7 +333,7 @@ def run_collapse_benchmark(config: CollapseConfig | None = None) -> dict[str, An
 
         # Eval RSRA-4B with dynamic test-time compute scaling!
         original_max_iter = rsra_model.rsra_block.config.max_iterations
-        rsra_model.rsra_block.config.max_iterations = max(5, n + 2)
+        rsra_model.rsra_block.config.max_iterations = max(8, n + 3)
         
         _, rsra_acc, avg_iters = evaluate_model(rsra_model, test_loader, device, is_rsra=True)
         extrap_results["rsra_acc"].append(rsra_acc)
@@ -337,7 +342,7 @@ def run_collapse_benchmark(config: CollapseConfig | None = None) -> dict[str, An
         # Restore original max_iterations
         rsra_model.rsra_block.config.max_iterations = original_max_iter
 
-        print(f"  Chain Length N = {n:2d} | Baseline Acc: {base_acc:6.1%} | RSRA-4B Acc: {rsra_acc:6.1%} | Avg Iters: {avg_iters:.2f}")
+        print(f"  Chain Length N = {n:2d} | Baseline Acc: {base_acc:6.1%} | RSRA-4B Acc: {rsra_acc:6.1%} | Avg Iters: {avg_iters:.2f}", flush=True)
 
     # 5. Gemini / Frontier Model Prompt Generation
     print("\n[5/6] Generating evaluation prompts for frontier models (Gemini)...")
@@ -466,7 +471,7 @@ def run_collapse_benchmark(config: CollapseConfig | None = None) -> dict[str, An
         ax.set_xlabel("Logical Implication Chain Length (N)", fontsize=12)
         ax.set_ylabel("Average Latent Refinement Iterations", fontsize=12)
         ax.set_title("RSRA-4B: Adaptive Latent Compute Allocation", fontsize=13, fontweight="bold")
-        ax.set_ylim(0, config.rsra_max_iterations + 0.5)
+        ax.set_ylim(0, max(extrap_results["rsra_iters"]) + 2)
         ax.grid(True, axis="y", alpha=0.3)
 
         comp_path = os.path.join(config.figures_dir, "collapse_compute.png")

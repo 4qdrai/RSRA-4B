@@ -280,11 +280,14 @@ class RSRAForTRLC(nn.Module):
         iters = rsra_out.iterations_used
         scores = rsra_out.checker_scores
 
-        # Mask padding positions before pooling
-        mask = (token_ids != self.pad_id).unsqueeze(-1).float()
-        h_masked = h * mask
-        lengths = mask.sum(dim=1).clamp(min=1)
-        pooled = h_masked.sum(dim=1) / lengths
+        # Query-token pooling: extract the last non-pad token (the '?' token)
+        # which has attended to all rules through self-attention
+        active_mask = (token_ids != self.pad_id)  # (B, S)
+        lengths = active_mask.sum(dim=1)  # (B,)
+        last_idx = (lengths - 1).clamp(min=0)  # (B,)
+        # Gather the representation at the query token position
+        gather_idx = last_idx.unsqueeze(1).unsqueeze(2).expand(-1, 1, h.size(-1))  # (B, 1, D)
+        pooled = torch.gather(h, dim=1, index=gather_idx).squeeze(1)  # (B, D)
 
         logits = self.classifier(pooled)
         return logits, iters, scores

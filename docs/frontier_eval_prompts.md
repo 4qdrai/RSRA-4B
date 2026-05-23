@@ -13,16 +13,16 @@ to evaluate their transitive reasoning accuracy at different complexity depths.
 You are a rigorous logical reasoning system. Evaluate the following set of implication rules and determine if the query implies a connection.
 
 Rules:
-x33 -> x34
-x0 -> x6
-x7 -> x36
-x14 -> x18
-x11 -> x24
-x1 -> x14
-x34 -> x7
+x16 -> x17
+x0 -> x3
+x3 -> x18
+x7 -> x9
+x5 -> x12
+x0 -> x7
+x17 -> x3
 
 Query:
-Does x33 imply x7 through a chain of rules?
+Does x16 imply x3 through a chain of rules?
 
 Think step-by-step to verify the chain of implication. Once you have traced the sequence, output your final answer on a new line EXACTLY as either 'Answer: TRUE' or 'Answer: FALSE'.
 ```
@@ -33,16 +33,16 @@ Think step-by-step to verify the chain of implication. Once you have traced the 
 You are a rigorous logical reasoning system. Evaluate the following set of implication rules and determine if the query implies a connection.
 
 Rules:
-x37 -> x6
-x17 -> x20
-x4 -> x39
-x6 -> x18
-x32 -> x4
-x10 -> x7
-x22 -> x4
+x18 -> x3
+x8 -> x10
+x2 -> x19
+x3 -> x9
+x16 -> x2
+x5 -> x3
+x11 -> x2
 
 Query:
-Does x22 imply x21 through a chain of rules?
+Does x11 imply x10 through a chain of rules?
 
 Think step-by-step to verify the chain of implication. Once you have traced the sequence, output your final answer on a new line EXACTLY as either 'Answer: TRUE' or 'Answer: FALSE'.
 ```
@@ -53,16 +53,16 @@ Think step-by-step to verify the chain of implication. Once you have traced the 
 You are a rigorous logical reasoning system. Evaluate the following set of implication rules and determine if the query implies a connection.
 
 Rules:
-x12 -> x8
-x15 -> x3
-x2 -> x27
-x23 -> x30
-x8 -> x16
-x2 -> x21
-x29 -> x37
+x6 -> x4
+x7 -> x1
+x1 -> x13
+x11 -> x15
+x4 -> x8
+x1 -> x10
+x14 -> x18
 
 Query:
-Does x12 imply x16 through a chain of rules?
+Does x6 imply x8 through a chain of rules?
 
 Think step-by-step to verify the chain of implication. Once you have traced the sequence, output your final answer on a new line EXACTLY as either 'Answer: TRUE' or 'Answer: FALSE'.
 ```
@@ -73,16 +73,16 @@ Think step-by-step to verify the chain of implication. Once you have traced the 
 You are a rigorous logical reasoning system. Evaluate the following set of implication rules and determine if the query implies a connection.
 
 Rules:
-x2 -> x17
-x36 -> x12
-x18 -> x22
-x35 -> x34
-x14 -> x0
-x39 -> x0
-x37 -> x38
+x18 -> x19
+x9 -> x11
+x18 -> x6
+x1 -> x8
+x19 -> x0
+x12 -> x3
+x7 -> x0
 
 Query:
-Does x39 imply x17 through a chain of rules?
+Does x19 imply x8 through a chain of rules?
 
 Think step-by-step to verify the chain of implication. Once you have traced the sequence, output your final answer on a new line EXACTLY as either 'Answer: TRUE' or 'Answer: FALSE'.
 ```
@@ -93,16 +93,16 @@ Think step-by-step to verify the chain of implication. Once you have traced the 
 You are a rigorous logical reasoning system. Evaluate the following set of implication rules and determine if the query implies a connection.
 
 Rules:
-x18 -> x4
-x17 -> x4
-x0 -> x39
-x3 -> x39
-x30 -> x7
-x9 -> x11
-x27 -> x3
+x2 -> x8
+x2 -> x0
+x1 -> x19
+x19 -> x9
+x19 -> x15
+x3 -> x4
+x5 -> x0
 
 Query:
-Does x27 imply x39 through a chain of rules?
+Does x1 imply x15 through a chain of rules?
 
 Think step-by-step to verify the chain of implication. Once you have traced the sequence, output your final answer on a new line EXACTLY as either 'Answer: TRUE' or 'Answer: FALSE'.
 ```
@@ -116,18 +116,18 @@ Think step-by-step to verify the chain of implication. Once you have traced the 
 You are a rigorous logical reasoning system. Evaluate the following set of implication rules and determine if the query implies a connection.
 
 Rules:
-x1 -> x4
-x2 -> x37
-x34 -> x2
-x14 -> x33
-x25 -> x2
-x37 -> x14
-x20 -> x3
-x9 -> x37
-x1 -> x8
+x0 -> x2
+x1 -> x18
+x17 -> x1
+x7 -> x16
+x12 -> x1
+x18 -> x7
+x10 -> x1
+x4 -> x18
+x0 -> x4
 
 Query:
-Does x25 imply x33 through a chain of rules?
+Does x12 imply x16 through a chain of rules?
 
 Think step-by-step to verify the chain of implication. Once you have traced the sequence, output your final answer on a new line EXACTLY as either 'Answer: TRUE' or 'Answer: FALSE'.
 ```
@@ -138,18 +138,18 @@ Think step-by-step to verify the chain of implication. Once you have traced the 
 You are a rigorous logical reasoning system. Evaluate the following set of implication rules and determine if the query implies a connection.
 
 Rules:
-x9 -> x27
-x29 -> x4
-x14 -> x21
-x22 -> x4
-x30 -> x29
-x4 -> x34
-x17 -> x9
-x6 -> x38
-x32 -> x28
+x4 -> x13
+x14 -> x2
+x7 -> x10
+x11 -> x2
+x15 -> x14
+x2 -> x17
+x8 -> x4
+x3 -> x19
+x16 -> x14
 
 Query:
-Does x9 imply x34 through a chain of rules?
+Does x4 imply x17 through a chain of rules?
 
 Think step-by-step to verify the chain of implication. Once you have traced the sequence, output your final answer on a new line EXACTLY as either 'Answer: TRUE' or 'Answer: FALSE'.
 ```
@@ -160,18 +160,18 @@ Think step-by-step to verify the chain of implication. Once you have traced the 
 You are a rigorous logical reasoning system. Evaluate the following set of implication rules and determine if the query implies a connection.
 
 Rules:
-x37 -> x15
-x7 -> x23
-x4 -> x18
-x36 -> x37
-x35 -> x11
-x23 -> x33
-x7 -> x37
-x39 -> x20
-x15 -> x39
+x17 -> x5
+x3 -> x11
+x2 -> x9
+x11 -> x16
+x7 -> x19
+x3 -> x18
+x5 -> x17
+x18 -> x7
+x19 -> x10
 
 Query:
-Does x7 imply x20 through a chain of rules?
+Does x3 imply x10 through a chain of rules?
 
 Think step-by-step to verify the chain of implication. Once you have traced the sequence, output your final answer on a new line EXACTLY as either 'Answer: TRUE' or 'Answer: FALSE'.
 ```
@@ -182,18 +182,18 @@ Think step-by-step to verify the chain of implication. Once you have traced the 
 You are a rigorous logical reasoning system. Evaluate the following set of implication rules and determine if the query implies a connection.
 
 Rules:
-x19 -> x12
-x24 -> x34
-x36 -> x1
-x25 -> x28
-x25 -> x36
+x7 -> x11
+x12 -> x18
+x9 -> x6
+x12 -> x14
+x12 -> x17
+x0 -> x16
+x8 -> x15
+x18 -> x0
 x5 -> x4
-x1 -> x33
-x11 -> x8
-x15 -> x23
 
 Query:
-Does x19 imply x33 through a chain of rules?
+Does x9 imply x16 through a chain of rules?
 
 Think step-by-step to verify the chain of implication. Once you have traced the sequence, output your final answer on a new line EXACTLY as either 'Answer: TRUE' or 'Answer: FALSE'.
 ```
@@ -204,18 +204,18 @@ Think step-by-step to verify the chain of implication. Once you have traced the 
 You are a rigorous logical reasoning system. Evaluate the following set of implication rules and determine if the query implies a connection.
 
 Rules:
-x24 -> x2
-x8 -> x24
-x24 -> x20
-x32 -> x20
-x2 -> x6
-x17 -> x39
-x3 -> x25
-x12 -> x7
-x6 -> x3
+x12 -> x10
+x1 -> x12
+x6 -> x12
+x16 -> x10
+x1 -> x6
+x3 -> x1
+x7 -> x8
+x12 -> x15
+x8 -> x19
 
 Query:
-Does x8 imply x3 through a chain of rules?
+Does x3 imply x10 through a chain of rules?
 
 Think step-by-step to verify the chain of implication. Once you have traced the sequence, output your final answer on a new line EXACTLY as either 'Answer: TRUE' or 'Answer: FALSE'.
 ```
@@ -229,20 +229,20 @@ Think step-by-step to verify the chain of implication. Once you have traced the 
 You are a rigorous logical reasoning system. Evaluate the following set of implication rules and determine if the query implies a connection.
 
 Rules:
-x32 -> x12
-x12 -> x27
-x34 -> x19
-x10 -> x9
-x32 -> x9
-x14 -> x13
-x32 -> x35
-x35 -> x34
-x8 -> x35
-x19 -> x32
-x6 -> x31
+x6 -> x13
+x9 -> x16
+x15 -> x7
+x13 -> x5
+x4 -> x15
+x6 -> x16
+x17 -> x16
+x4 -> x3
+x17 -> x9
+x4 -> x17
+x16 -> x6
 
 Query:
-Does x8 imply x27 through a chain of rules?
+Does x4 imply x5 through a chain of rules?
 
 Think step-by-step to verify the chain of implication. Once you have traced the sequence, output your final answer on a new line EXACTLY as either 'Answer: TRUE' or 'Answer: FALSE'.
 ```
@@ -253,20 +253,20 @@ Think step-by-step to verify the chain of implication. Once you have traced the 
 You are a rigorous logical reasoning system. Evaluate the following set of implication rules and determine if the query implies a connection.
 
 Rules:
-x27 -> x11
-x38 -> x17
-x12 -> x25
-x21 -> x6
-x36 -> x18
-x18 -> x0
-x8 -> x22
-x6 -> x15
-x35 -> x18
-x15 -> x17
-x3 -> x35
+x18 -> x4
+x7 -> x8
+x8 -> x0
+x9 -> x18
+x12 -> x19
+x10 -> x3
+x11 -> x13
+x3 -> x7
+x5 -> x6
+x11 -> x3
+x0 -> x18
 
 Query:
-Does x3 imply x17 through a chain of rules?
+Does x10 imply x9 through a chain of rules?
 
 Think step-by-step to verify the chain of implication. Once you have traced the sequence, output your final answer on a new line EXACTLY as either 'Answer: TRUE' or 'Answer: FALSE'.
 ```
@@ -277,20 +277,20 @@ Think step-by-step to verify the chain of implication. Once you have traced the 
 You are a rigorous logical reasoning system. Evaluate the following set of implication rules and determine if the query implies a connection.
 
 Rules:
-x26 -> x20
-x14 -> x9
-x20 -> x27
-x30 -> x34
-x9 -> x21
-x23 -> x27
-x25 -> x30
-x21 -> x30
-x34 -> x20
-x0 -> x37
-x7 -> x0
+x13 -> x3
+x18 -> x12
+x10 -> x18
+x19 -> x8
+x4 -> x11
+x15 -> x13
+x3 -> x0
+x11 -> x10
+x0 -> x11
+x6 -> x14
+x18 -> x7
 
 Query:
-Does x14 imply x27 through a chain of rules?
+Does x13 imply x12 through a chain of rules?
 
 Think step-by-step to verify the chain of implication. Once you have traced the sequence, output your final answer on a new line EXACTLY as either 'Answer: TRUE' or 'Answer: FALSE'.
 ```
@@ -301,20 +301,20 @@ Think step-by-step to verify the chain of implication. Once you have traced the 
 You are a rigorous logical reasoning system. Evaluate the following set of implication rules and determine if the query implies a connection.
 
 Rules:
-x25 -> x36
-x9 -> x10
-x10 -> x17
-x17 -> x37
-x37 -> x35
-x27 -> x0
+x19 -> x14
 x18 -> x2
-x29 -> x33
-x27 -> x36
-x6 -> x1
-x14 -> x9
+x3 -> x10
+x1 -> x3
+x16 -> x14
+x0 -> x14
+x16 -> x2
+x3 -> x14
+x15 -> x5
+x14 -> x16
+x9 -> x1
 
 Query:
-Does x14 imply x36 through a chain of rules?
+Does x0 imply x10 through a chain of rules?
 
 Think step-by-step to verify the chain of implication. Once you have traced the sequence, output your final answer on a new line EXACTLY as either 'Answer: TRUE' or 'Answer: FALSE'.
 ```
@@ -325,20 +325,20 @@ Think step-by-step to verify the chain of implication. Once you have traced the 
 You are a rigorous logical reasoning system. Evaluate the following set of implication rules and determine if the query implies a connection.
 
 Rules:
-x10 -> x13
-x5 -> x30
-x15 -> x22
-x37 -> x5
-x2 -> x17
-x30 -> x10
-x2 -> x25
-x38 -> x12
-x13 -> x4
-x28 -> x37
-x34 -> x27
+x6 -> x18
+x3 -> x4
+x12 -> x13
+x7 -> x14
+x7 -> x8
+x10 -> x12
+x6 -> x4
+x1 -> x2
+x13 -> x2
+x2 -> x7
+x14 -> x3
 
 Query:
-Does x28 imply x4 through a chain of rules?
+Does x10 imply x3 through a chain of rules?
 
 Think step-by-step to verify the chain of implication. Once you have traced the sequence, output your final answer on a new line EXACTLY as either 'Answer: TRUE' or 'Answer: FALSE'.
 ```
@@ -352,22 +352,22 @@ Think step-by-step to verify the chain of implication. Once you have traced the 
 You are a rigorous logical reasoning system. Evaluate the following set of implication rules and determine if the query implies a connection.
 
 Rules:
-x15 -> x30
-x35 -> x5
-x21 -> x5
-x17 -> x23
-x30 -> x21
-x20 -> x14
-x12 -> x4
-x5 -> x34
-x21 -> x38
-x23 -> x15
-x6 -> x22
-x34 -> x20
-x9 -> x22
+x2 -> x19
+x11 -> x7
+x10 -> x2
+x11 -> x10
+x4 -> x3
+x7 -> x6
+x7 -> x15
+x15 -> x10
+x8 -> x11
+x17 -> x4
+x2 -> x10
+x13 -> x2
+x2 -> x17
 
 Query:
-Does x17 imply x14 through a chain of rules?
+Does x8 imply x3 through a chain of rules?
 
 Think step-by-step to verify the chain of implication. Once you have traced the sequence, output your final answer on a new line EXACTLY as either 'Answer: TRUE' or 'Answer: FALSE'.
 ```
@@ -378,22 +378,22 @@ Think step-by-step to verify the chain of implication. Once you have traced the 
 You are a rigorous logical reasoning system. Evaluate the following set of implication rules and determine if the query implies a connection.
 
 Rules:
-x37 -> x29
-x28 -> x34
-x29 -> x8
-x6 -> x12
-x33 -> x34
-x31 -> x27
-x27 -> x6
-x17 -> x37
-x37 -> x7
-x26 -> x39
-x8 -> x39
-x12 -> x28
-x7 -> x34
+x14 -> x15
+x3 -> x13
+x15 -> x18
+x17 -> x3
+x8 -> x19
+x16 -> x9
+x19 -> x6
+x17 -> x4
+x6 -> x17
+x18 -> x14
+x4 -> x8
+x13 -> x16
+x2 -> x11
 
 Query:
-Does x27 imply x39 through a chain of rules?
+Does x18 imply x13 through a chain of rules?
 
 Think step-by-step to verify the chain of implication. Once you have traced the sequence, output your final answer on a new line EXACTLY as either 'Answer: TRUE' or 'Answer: FALSE'.
 ```
@@ -404,22 +404,22 @@ Think step-by-step to verify the chain of implication. Once you have traced the 
 You are a rigorous logical reasoning system. Evaluate the following set of implication rules and determine if the query implies a connection.
 
 Rules:
-x30 -> x34
-x14 -> x10
-x26 -> x30
-x10 -> x36
-x2 -> x33
-x37 -> x26
-x34 -> x14
-x15 -> x16
-x3 -> x5
-x15 -> x21
-x6 -> x8
-x36 -> x6
-x16 -> x24
+x7 -> x8
+x12 -> x7
+x4 -> x8
+x8 -> x12
+x1 -> x2
+x13 -> x12
+x16 -> x13
+x18 -> x3
+x7 -> x10
+x14 -> x18
+x10 -> x1
+x3 -> x4
+x1 -> x16
 
 Query:
-Does x37 imply x8 through a chain of rules?
+Does x18 imply x16 through a chain of rules?
 
 Think step-by-step to verify the chain of implication. Once you have traced the sequence, output your final answer on a new line EXACTLY as either 'Answer: TRUE' or 'Answer: FALSE'.
 ```
@@ -430,22 +430,22 @@ Think step-by-step to verify the chain of implication. Once you have traced the 
 You are a rigorous logical reasoning system. Evaluate the following set of implication rules and determine if the query implies a connection.
 
 Rules:
-x22 -> x34
-x27 -> x12
-x0 -> x19
-x34 -> x5
-x28 -> x36
-x19 -> x10
-x7 -> x5
-x8 -> x3
-x0 -> x10
-x20 -> x22
-x19 -> x20
-x4 -> x28
-x36 -> x0
+x11 -> x0
+x5 -> x13
+x9 -> x5
+x0 -> x9
+x2 -> x9
+x5 -> x4
+x11 -> x17
+x1 -> x4
+x15 -> x2
+x16 -> x3
+x10 -> x11
+x2 -> x0
+x17 -> x16
 
 Query:
-Does x4 imply x33 through a chain of rules?
+Does x10 imply x13 through a chain of rules?
 
 Think step-by-step to verify the chain of implication. Once you have traced the sequence, output your final answer on a new line EXACTLY as either 'Answer: TRUE' or 'Answer: FALSE'.
 ```
@@ -456,22 +456,22 @@ Think step-by-step to verify the chain of implication. Once you have traced the 
 You are a rigorous logical reasoning system. Evaluate the following set of implication rules and determine if the query implies a connection.
 
 Rules:
-x30 -> x18
-x1 -> x33
-x22 -> x34
-x20 -> x2
-x21 -> x24
-x38 -> x18
-x31 -> x25
-x9 -> x34
-x34 -> x9
-x14 -> x1
-x9 -> x14
-x25 -> x27
-x27 -> x22
+x12 -> x1
+x17 -> x3
+x9 -> x10
+x8 -> x16
+x4 -> x3
+x1 -> x4
+x19 -> x9
+x15 -> x9
+x4 -> x17
+x10 -> x12
+x3 -> x17
+x0 -> x16
+x16 -> x19
 
 Query:
-Does x31 imply x33 through a chain of rules?
+Does x0 imply x17 through a chain of rules?
 
 Think step-by-step to verify the chain of implication. Once you have traced the sequence, output your final answer on a new line EXACTLY as either 'Answer: TRUE' or 'Answer: FALSE'.
 ```
@@ -485,24 +485,24 @@ Think step-by-step to verify the chain of implication. Once you have traced the 
 You are a rigorous logical reasoning system. Evaluate the following set of implication rules and determine if the query implies a connection.
 
 Rules:
-x22 -> x28
-x34 -> x24
-x2 -> x8
-x30 -> x23
-x23 -> x26
-x15 -> x4
-x11 -> x22
-x30 -> x14
-x3 -> x32
-x32 -> x30
-x8 -> x10
-x28 -> x0
-x10 -> x11
-x26 -> x2
-x0 -> x2
+x14 -> x0
+x1 -> x16
+x0 -> x17
+x7 -> x2
+x13 -> x4
+x11 -> x13
+x15 -> x7
+x15 -> x11
+x4 -> x5
+x8 -> x15
+x15 -> x13
+x16 -> x15
+x5 -> x14
+x17 -> x12
+x3 -> x1
 
 Query:
-Does x3 imply x28 through a chain of rules?
+Does x1 imply x12 through a chain of rules?
 
 Think step-by-step to verify the chain of implication. Once you have traced the sequence, output your final answer on a new line EXACTLY as either 'Answer: TRUE' or 'Answer: FALSE'.
 ```
@@ -513,24 +513,24 @@ Think step-by-step to verify the chain of implication. Once you have traced the 
 You are a rigorous logical reasoning system. Evaluate the following set of implication rules and determine if the query implies a connection.
 
 Rules:
-x10 -> x7
-x25 -> x13
-x36 -> x38
-x11 -> x5
-x29 -> x8
-x33 -> x30
-x20 -> x27
-x11 -> x17
-x33 -> x11
-x27 -> x36
-x1 -> x12
-x38 -> x1
-x8 -> x38
-x5 -> x20
-x17 -> x5
+x16 -> x15
+x5 -> x13
+x4 -> x19
+x4 -> x3
+x6 -> x16
+x13 -> x18
+x0 -> x6
+x15 -> x14
+x6 -> x17
+x14 -> x4
+x2 -> x17
+x19 -> x0
+x18 -> x13
+x6 -> x9
+x18 -> x2
 
 Query:
-Does x25 imply x12 through a chain of rules?
+Does x5 imply x3 through a chain of rules?
 
 Think step-by-step to verify the chain of implication. Once you have traced the sequence, output your final answer on a new line EXACTLY as either 'Answer: TRUE' or 'Answer: FALSE'.
 ```
@@ -541,24 +541,24 @@ Think step-by-step to verify the chain of implication. Once you have traced the 
 You are a rigorous logical reasoning system. Evaluate the following set of implication rules and determine if the query implies a connection.
 
 Rules:
-x33 -> x24
-x8 -> x33
-x39 -> x24
-x12 -> x4
+x3 -> x9
+x12 -> x16
+x2 -> x12
+x8 -> x2
 x4 -> x2
-x0 -> x23
-x9 -> x15
-x25 -> x2
-x2 -> x39
-x24 -> x12
-x15 -> x33
-x38 -> x9
-x16 -> x4
-x9 -> x6
-x39 -> x0
+x14 -> x1
+x16 -> x3
+x7 -> x10
+x5 -> x17
+x4 -> x1
+x6 -> x11
+x1 -> x19
+x19 -> x0
+x0 -> x11
+x11 -> x8
 
 Query:
-Does x38 imply x23 through a chain of rules?
+Does x4 imply x9 through a chain of rules?
 
 Think step-by-step to verify the chain of implication. Once you have traced the sequence, output your final answer on a new line EXACTLY as either 'Answer: TRUE' or 'Answer: FALSE'.
 ```
@@ -569,24 +569,24 @@ Think step-by-step to verify the chain of implication. Once you have traced the 
 You are a rigorous logical reasoning system. Evaluate the following set of implication rules and determine if the query implies a connection.
 
 Rules:
-x13 -> x23
-x35 -> x18
-x19 -> x16
-x23 -> x16
-x16 -> x12
-x20 -> x11
+x15 -> x7
+x15 -> x8
+x10 -> x9
+x18 -> x19
+x3 -> x16
 x12 -> x8
-x20 -> x10
-x3 -> x14
-x14 -> x35
-x5 -> x30
-x25 -> x16
-x5 -> x3
-x14 -> x3
-x8 -> x5
+x7 -> x17
+x15 -> x0
+x0 -> x5
+x9 -> x11
+x2 -> x15
+x5 -> x12
+x8 -> x2
+x1 -> x3
+x1 -> x10
 
 Query:
-Does x20 imply x18 through a chain of rules?
+Does x0 imply x11 through a chain of rules?
 
 Think step-by-step to verify the chain of implication. Once you have traced the sequence, output your final answer on a new line EXACTLY as either 'Answer: TRUE' or 'Answer: FALSE'.
 ```
@@ -597,24 +597,24 @@ Think step-by-step to verify the chain of implication. Once you have traced the 
 You are a rigorous logical reasoning system. Evaluate the following set of implication rules and determine if the query implies a connection.
 
 Rules:
-x3 -> x18
-x6 -> x14
-x1 -> x20
-x21 -> x29
-x38 -> x3
-x4 -> x16
-x33 -> x10
-x13 -> x4
-x13 -> x7
-x18 -> x33
-x30 -> x28
-x7 -> x30
-x28 -> x13
-x16 -> x38
-x32 -> x15
+x4 -> x1
+x16 -> x9
+x10 -> x14
+x13 -> x2
+x2 -> x16
+x1 -> x2
+x3 -> x10
+x6 -> x3
+x17 -> x0
+x11 -> x18
+x11 -> x4
+x7 -> x11
+x14 -> x7
+x16 -> x8
+x14 -> x4
 
 Query:
-Does x7 imply x10 through a chain of rules?
+Does x6 imply x8 through a chain of rules?
 
 Think step-by-step to verify the chain of implication. Once you have traced the sequence, output your final answer on a new line EXACTLY as either 'Answer: TRUE' or 'Answer: FALSE'.
 ```
