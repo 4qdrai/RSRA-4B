@@ -57,8 +57,8 @@ def run_eval_fix():
 
     print(f"Loading checkpoint from {checkpoint_path}...")
     checkpoint = torch.load(checkpoint_path, map_location=device)
-    baseline.load_state_dict(checkpoint["baseline_state_dict"])
-    rsra.load_state_dict(checkpoint["rsra_state_dict"])
+    baseline.load_state_dict(checkpoint["baseline_state"])
+    rsra.load_state_dict(checkpoint["rsra_state"])
     print("Checkpoints loaded successfully!")
 
     # Test 1: Mismatched Length Evaluation (Original Extrapolation, but with fixed early stopping and optimal iterations)
