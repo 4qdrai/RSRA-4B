@@ -1,7 +1,15 @@
 import os
+import sys
 import torch
 import random
+from pathlib import Path
 from torch.utils.data import DataLoader
+
+# Add src/ and scripts/ to python path
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
+sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
+
 from rsra.benchmarks.relation_chain_task import TRLCDataset, TRLCTokenizer, RSRAForTRLC
 from rsra.benchmarks.baseline_transformer import BaselineConfig, BaselineTransformer
 from rsra.core.rsra_block import RSRABlock, RSRABlockConfig
