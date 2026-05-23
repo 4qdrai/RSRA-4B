@@ -285,8 +285,8 @@
   }
 
   .figure-img {
-    max-width: 85%;
-    max-height: 9.5cm;
+    max-width: 80%;
+    max-height: 5.5cm; /* Reduced from 9.5cm to prevent overflow and preserve captions! */
     height: auto;
   }
 
@@ -447,14 +447,6 @@
     <p>
       <strong>Differentiation from RSRA-4B.</strong> JEPA is primarily a <em>training paradigm</em> &mdash; it prescribes how representations should be learned (via latent prediction) but does not specify how they should be <em>used</em> at inference time. RSRA-4B extends the JEPA philosophy from a passive training signal to an <em>active inference-time component</em>: our consequence space serves as the target manifold against which checker networks evaluate hidden states, and the discrepancy drives recursive refinement. In JEPA terms, RSRA-4B uses the joint embedding structure not merely to learn representations but to continuously <em>verify and correct</em> them during generation.
     </p>
-    
-    <div class="subsection-title">2.3 Process Reward Models (PRMs)</div>
-    <p class="no-indent">
-      Lightman et al. (2023) introduced process-level supervision, training verifier models to evaluate individual reasoning steps in mathematical problem solving. This approach significantly outperforms outcome-only reward models and enables best-of-$N$ sampling strategies where a verifier selects the most promising reasoning path.
-    </p>
-    <p>
-      <strong>Differentiation from RSRA-4B.</strong> PRMs operate in <em>token space</em> &mdash; they evaluate reasoning steps that have already been decoded into natural language. This creates three limitations that RSRA-4B addresses: (i) verification occurs <em>after</em> tokenization, so corrupted hidden states have already influenced the KV-cache and downstream attention; (ii) the verifier is a separate model trained independently, creating a distribution mismatch between generator and verifier; (iii) effective use requires expensive search over multiple candidate completions. RSRA-4B verifies in <em>latent space</em> before tokenization, trains the checker <em>jointly</em> with the generator via a shared loss, and requires no external search &mdash; refinement occurs within the forward pass itself.
-    </p>
   </div>
 
   <!-- ==================== PAGE 4 ==================== -->
@@ -464,7 +456,15 @@
       <span>Section 2 (Continued)</span>
     </div>
     
-    <div class="subsection-title" style="margin-top: 0.5cm;">2.4 Quiet-STaR</div>
+    <div class="subsection-title" style="margin-top: 0.5cm;">2.3 Process Reward Models (PRMs)</div>
+    <p class="no-indent">
+      Lightman et al. (2023) introduced process-level supervision, training verifier models to evaluate individual reasoning steps in mathematical problem solving. This approach significantly outperforms outcome-only reward models and enables best-of-$N$ sampling strategies where a verifier selects the most promising reasoning path.
+    </p>
+    <p>
+      <strong>Differentiation from RSRA-4B.</strong> PRMs operate in <em>token space</em> &mdash; they evaluate reasoning steps that have already been decoded into natural language. This creates three limitations that RSRA-4B addresses: (i) verification occurs <em>after</em> tokenization, so corrupted hidden states have already influenced the KV-cache and downstream attention; (ii) the verifier is a separate model trained independently, creating a distribution mismatch between generator and verifier; (iii) effective use requires expensive search over multiple candidate completions. RSRA-4B verifies in <em>latent space</em> before tokenization, trains the checker <em>jointly</em> with the generator via a shared loss, and requires no external search &mdash; refinement occurs within the forward pass itself.
+    </p>
+    
+    <div class="subsection-title">2.4 Quiet-STaR</div>
     <p class="no-indent">
       Zelikman et al. (2024) proposed generating internal "thoughts" &mdash; auxiliary token sequences &mdash; at each position during generation. These thoughts are generated, evaluated, and used to improve the next-token prediction. The approach elegantly leverages the model's existing generation capability for self-improvement.
     </p>
@@ -479,14 +479,6 @@
     <p>
       <strong>Differentiation from RSRA-4B.</strong> Both ACT and PonderNet use scalar halting signals &mdash; a single number indicates "stop" or "continue" without providing any <em>diagnostic information</em> about what is wrong with the current state or how to fix it. RSRA-4B's checker networks produce a structured evaluation $v_{l,t}^{(k)} = C_l(\tilde{h}_{l,t}^{(k)}) \in [0, 1]$ trained against <em>consequence targets</em> $v_{\text{target}}$ that encode the downstream utility of the state. This signal not only decides halting but <em>guides</em> the refinement operator $R_l$ toward better states. Additionally, RSRA-4B's four-tier routing provides qualitatively different compute allocation strategies (not just "more iterations" but "different abstraction levels"), a capability absent from ACT and PonderNet's single-level iteration.
     </p>
-    
-    <div class="subsection-title">2.6 COCONUT (Chain of Continuous Thought)</div>
-    <p class="no-indent">
-      COCONUT (Hao et al., 2024) replaces discrete chain-of-thought reasoning with <em>continuous thought</em> in latent space: instead of generating intermediate reasoning tokens, the model performs reasoning steps as transformations of hidden states.
-    </p>
-    <p>
-      <strong>Differentiation from RSRA-4B.</strong> Both COCONUT and RSRA-4B operate in continuous latent space, but they differ fundamentally in verification, hierarchical structure, training signals, and convergence guarantees. COCONUT demonstrates that latent-space reasoning <em>works</em>; RSRA-4B adds the critical missing components: <em>verification</em> (how do we know the latent reasoning is correct?), <em>hierarchy</em> (how do we allocate different types of compute?), and <em>convergence</em> (how do we guarantee the iteration terminates at a useful state?).
-    </p>
   </div>
 
   <!-- ==================== PAGE 5 ==================== -->
@@ -496,7 +488,15 @@
       <span>Section 2 (Continued) & Section 3</span>
     </div>
     
-    <div class="subsection-title" style="margin-top: 0.5cm;">2.7 Mixture of Recursions (MoR)</div>
+    <div class="subsection-title" style="margin-top: 0.5cm;">2.6 COCONUT (Chain of Continuous Thought)</div>
+    <p class="no-indent">
+      COCONUT (Hao et al., 2024) replaces discrete chain-of-thought reasoning with <em>continuous thought</em> in latent space: instead of generating intermediate reasoning tokens, the model performs reasoning steps as transformations of hidden states.
+    </p>
+    <p>
+      <strong>Differentiation from RSRA-4B.</strong> Both COCONUT and RSRA-4B operate in continuous latent space, but they differ fundamentally in verification, hierarchical structure, training signals, and convergence guarantees. COCONUT demonstrates that latent-space reasoning <em>works</em>; RSRA-4B adds the critical missing components: <em>verification</em> (how do we know the latent reasoning is correct?), <em>hierarchy</em> (how do we allocate different types of compute?), and <em>convergence</em> (how do we guarantee the iteration terminates at a useful state?).
+    </p>
+    
+    <div class="subsection-title">2.7 Mixture of Recursions (MoR)</div>
     <p class="no-indent">
       The Mixture of Recursions framework (Tan et al., 2025) introduces token-specific recursion depths: a router assigns each token a different number of recursive passes through shared layers.
     </p>
@@ -511,8 +511,16 @@
     <p>
       <strong>Differentiation from RSRA-4B.</strong> DRM's denoising process is <em>undirected</em> &mdash; it recovers signal from noise without a target-directed evaluation of quality. RSRA-4B's refinement is <em>goal-directed</em>: the checker network evaluates each intermediate state against consequence targets, providing a gradient signal that explicitly steers refinement toward representations with high downstream utility. Additionally, DRM inherits the computational overhead of diffusion processes, while RSRA-4B's contraction constraints guarantee convergence in $O(\log(1/\varepsilon))$ iterations.
     </p>
+  </div>
+
+  <!-- ==================== PAGE 6 ==================== -->
+  <div class="page" id="page-6">
+    <div class="running-header">
+      <span>RSRA-4B: Intrinsic Latent Verification for Frontier Reasoning</span>
+      <span>Section 2 (Continued) & Section 3</span>
+    </div>
     
-    <div class="subsection-title">2.9 Dynamic Self-Verify Decoding (DSVD)</div>
+    <div class="subsection-title" style="margin-top: 0.5cm;">2.9 Dynamic Self-Verify Decoding (DSVD)</div>
     <p class="no-indent">
       Dynamic Self-Verify Decoding (2024&ndash;2025) attaches parallel probing heads to frozen transformer layers, monitoring internal representations for anomalies during inference. When a probing head detects low confidence, the decoder backtracks or re-samples.
     </p>
@@ -534,8 +542,8 @@
     </div>
   </div>
 
-  <!-- ==================== PAGE 6 ==================== -->
-  <div class="page" id="page-6">
+  <!-- ==================== PAGE 7 ==================== -->
+  <div class="page" id="page-7">
     <div class="running-header">
       <span>RSRA-4B: Intrinsic Latent Verification for Frontier Reasoning</span>
       <span>Section 3 (Continued)</span>
@@ -576,8 +584,16 @@
       <li><strong>Refine</strong> ($v_{l,t}^{(k)} < \tau_l$ and $k < K_{\max}$): The state is uncertain; invoke the refinement operator.</li>
       <li><strong>Escalate</strong> ($v_{l,t}^{(k)} < \tau_l$ and $k = K_{\max}$): Refinement has exhausted its budget; route to tier $l+1$.</li>
     </ol>
+  </div>
+
+  <!-- ==================== PAGE 8 ==================== -->
+  <div class="page" id="page-8">
+    <div class="running-header">
+      <span>RSRA-4B: Intrinsic Latent Verification for Frontier Reasoning</span>
+      <span>Section 3 (Continued)</span>
+    </div>
     
-    <div class="subsection-title">3.4 Refinement Operator $R_l$</div>
+    <div class="subsection-title" style="margin-top: 0.5cm;">3.4 Refinement Operator $R_l$</div>
     <p class="no-indent">
       When the checker signals insufficient confidence, the refinement operator produces a corrected state:
     </p>
@@ -612,8 +628,8 @@
     </div>
   </div>
 
-  <!-- ==================== PAGE 7 ==================== -->
-  <div class="page" id="page-7">
+  <!-- ==================== PAGE 9 ==================== -->
+  <div class="page" id="page-9">
     <div class="running-header">
       <span>RSRA-4B: Intrinsic Latent Verification for Frontier Reasoning</span>
       <span>Section 3 (Continued) & Section 4</span>
@@ -675,11 +691,16 @@
         </tr>
       </tbody>
     </table>
-    <p class="no-indent">
-      The empirical convergence matches the theoretical bound exactly, validating the Banach contraction analysis.
-    </p>
+  </div>
+
+  <!-- ==================== PAGE 10 ==================== -->
+  <div class="page" id="page-10">
+    <div class="running-header">
+      <span>RSRA-4B: Intrinsic Latent Verification for Frontier Reasoning</span>
+      <span>Section 4 (Continued)</span>
+    </div>
     
-    <div class="subsection-title">4.2 KV-Cache Memory Profiling</div>
+    <div class="subsection-title" style="margin-top: 0.5cm;">4.2 KV-Cache Memory Profiling</div>
     <p class="no-indent">
       We profiled KV-cache memory allocation for equivalent reasoning depth using three paradigms:
     </p>
@@ -715,16 +736,8 @@
         </tr>
       </tbody>
     </table>
-  </div>
-
-  <!-- ==================== PAGE 8 ==================== -->
-  <div class="page" id="page-8">
-    <div class="running-header">
-      <span>RSRA-4B: Intrinsic Latent Verification for Frontier Reasoning</span>
-      <span>Section 4 (Continued) & Section 5</span>
-    </div>
     
-    <div class="subsection-title" style="margin-top: 0.5cm;">4.3 Reasoning Decay Simulation</div>
+    <div class="subsection-title">4.3 Reasoning Decay Simulation</div>
     <p class="no-indent">
       We modeled the accuracy of multi-step logical reasoning under two regimes: (1) Standard autoregressive model: Per-step accuracy $p = 0.95$, sequence accuracy $A_{\text{standard}}(N) = p^N$; (2) RSRA-4B model: Per-step accuracy $p = 0.95$, anomaly detection rate $d = 0.85$, correction success rate $c = 0.80$, effective per-step accuracy $p_{\text{eff}} = 1 - (1-p)(1 - d \cdot c) = 0.984$.
     </p>
@@ -761,8 +774,16 @@
         </tr>
       </tbody>
     </table>
+  </div>
+
+  <!-- ==================== PAGE 11 ==================== -->
+  <div class="page" id="page-11">
+    <div class="running-header">
+      <span>RSRA-4B: Intrinsic Latent Verification for Frontier Reasoning</span>
+      <span>Section 4 (Continued) & Section 5</span>
+    </div>
     
-    <div class="figure-container">
+    <div class="figure-container" style="margin-top: 0.5cm;">
       <img src="../figures/reasoning_decay_comparison.png" class="figure-img" alt="Reasoning Decay" />
       <div class="figure-caption">
         Figure 2: Multi-step Reasoning Decay. Standard autoregressive models decay exponentially to &lt;1% accuracy at 100 steps. RSRA-4B maintains $p_{\text{eff}} = 98.4\%$ and preserves accuracy at 19.7% to &gt;68% through latent verification.
@@ -805,8 +826,8 @@
     </table>
   </div>
 
-  <!-- ==================== PAGE 9 ==================== -->
-  <div class="page" id="page-9">
+  <!-- ==================== PAGE 12 ==================== -->
+  <div class="page" id="page-12">
     <div class="running-header">
       <span>RSRA-4B: Intrinsic Latent Verification for Frontier Reasoning</span>
       <span>Section 5 (Continued) & Section 6</span>
@@ -874,8 +895,16 @@
       <li><strong>Extreme compute efficiency:</strong> Parameter reuse across recursive iterations enables deep reasoning with minimal parameter overhead.</li>
       <li><strong>Memory efficiency:</strong> $O(1)$ KV-cache scaling with respect to reasoning depth, versus $O(N)$ for token-space reasoning approaches.</li>
     </ul>
+  </div>
+
+  <!-- ==================== PAGE 13 ==================== -->
+  <div class="page" id="page-13">
+    <div class="running-header">
+      <span>RSRA-4B: Intrinsic Latent Verification for Frontier Reasoning</span>
+      <span>Section 6 (Continued) & Section 7 & References</span>
+    </div>
     
-    <div class="subsection-title">6.2 Honest Limitations and Open Questions</div>
+    <div class="subsection-title" style="margin-top: 0.5cm;">6.2 Honest Limitations and Open Questions</div>
     <p class="no-indent">
       <strong>No full-scale training run has been conducted.</strong> All evidence to date is from simulations, analytical derivations, and theoretical proofs. The critical test &mdash; whether joint training of checker networks with generation actually produces well-calibrated consequence evaluations &mdash; is a Stage 1 deliverable. We consider this the highest-risk element of the proposal.
     </p>
@@ -885,24 +914,24 @@
     <p>
       <strong>Spectral norm constraints may limit expressivity.</strong> The Banach contraction requirement ($\|R_l\|_{\text{op}} \leq \rho < 1$) restricts the function class of refinement operators. The monotone operator alternative (Theorem 2) relaxes this constraint while preserving convergence.
     </p>
-  </div>
-
-  <!-- ==================== PAGE 10 ==================== -->
-  <div class="page" id="page-10">
-    <div class="running-header">
-      <span>RSRA-4B: Intrinsic Latent Verification for Frontier Reasoning</span>
-      <span>Section 7 & Section 8 & References</span>
-    </div>
     
-    <div class="section-title" style="margin-top: 0.5cm;">7. Conclusion</div>
+    <div class="section-title">7. Conclusion</div>
     <p class="no-indent">
       The Recursive Self-Reflective Architecture represents a structural answer to the fundamental limitation of autoregressive generation: the absence of intrinsic self-correction. By embedding checker networks and recursive refinement operators directly into a hierarchical forward pass, RSRA-4B transforms the generation process from a single-shot prediction into an iterative, self-verifying computation.
     </p>
     <p>
       The architecture achieves what no prior work provides simultaneously: <em>intrinsic verification</em> (unlike DEQs, COCONUT, and MoR), <em>continuous latent-space operation</em> (unlike PRMs, RLHF, and Quiet-STaR), <em>hierarchical abstraction routing</em> (unlike any prior work), and <em>formal convergence guarantees</em>. Our preliminary evidence validates the core mechanisms at the theoretical and simulation level, paving the way for full-scale development in Stage 1 of the SPRIND Challenge.
     </p>
+  </div>
+
+  <!-- ==================== PAGE 14 ==================== -->
+  <div class="page" id="page-14">
+    <div class="running-header">
+      <span>RSRA-4B: Intrinsic Latent Verification for Frontier Reasoning</span>
+      <span>References</span>
+    </div>
     
-    <div class="section-title">References</div>
+    <div class="section-title" style="margin-top: 0.5cm;">References</div>
     <div class="references-list">
       <div class="reference-item">Assran, M., Duval, Q., Misra, I., Bojanowski, P., Vincent, P., Rabbat, M., LeCun, Y., & Balestriero, R. (2023). Self-supervised learning from images with a joint-embedding predictive architecture. <em>CVPR</em>.</div>
       <div class="reference-item">Bai, S., Kolter, J. Z., & Koltun, V. (2019). Deep equilibrium models. <em>NeurIPS</em>.</div>
@@ -920,14 +949,14 @@
       <div class="reference-item">Rafailov, R., Sharma, A., Mitchell, E., Ermon, S., Manning, C. D., & Finn, C. (2023). Direct preference optimization: Your language model is secretly a reward model. <em>NeurIPS</em>.</div>
       <div class="reference-item">Tan, M., et al. (2025). Mixture of Recursions: Learning dynamic recursive depths for adaptive token-level computation. <em>arXiv preprint</em>.</div>
       <div class="reference-item">Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., ... & Polosukhin, I. (2017). Attention is all you need. <em>NeurIPS</em>.</div>
-      <div class="reference-item">Wei, J., font-weight: normal; Chain-of-thought prompting elicits reasoning in large language models. <em>NeurIPS</em>.</div>
+      <div class="reference-item">Wei, J., Wang, X., Schuurmans, D., Bosma, M., Ichter, B., Xia, F., ... & Zhou, D. (2022). Chain-of-thought prompting elicits reasoning in large language models. <em>NeurIPS</em>.</div>
       <div class="reference-item">Winston, E., & Kolter, J. Z. (2020). Monotone operator equilibrium networks. <em>NeurIPS</em>.</div>
       <div class="reference-item">Zelikman, E., Harik, G., Shao, Y., Jayasiri, V., Haber, N., & Goodman, N. D. (2024). Quiet-STaR: Language models can teach themselves to think before speaking. <em>arXiv preprint arXiv:2403.09629</em>.</div>
     </div>
   </div>
 
-  <!-- ==================== PAGE 11 ==================== -->
-  <div class="page" id="page-11">
+  <!-- ==================== PAGE 15 ==================== -->
+  <div class="page" id="page-15">
     <div class="running-header">
       <span>RSRA-4B: Intrinsic Latent Verification for Frontier Reasoning</span>
       <span>Appendix A: Mathematical Foundations</span>
@@ -975,8 +1004,8 @@
     </p>
   </div>
 
-  <!-- ==================== PAGE 12 ==================== -->
-  <div class="page" id="page-12">
+  <!-- ==================== PAGE 16 ==================== -->
+  <div class="page" id="page-16">
     <div class="running-header">
       <span>RSRA-4B: Intrinsic Latent Verification for Frontier Reasoning</span>
       <span>Appendix A: Mathematical Foundations (Continued)</span>
@@ -1016,8 +1045,8 @@
     </p>
   </div>
 
-  <!-- ==================== PAGE 13 ==================== -->
-  <div class="page" id="page-13">
+  <!-- ==================== PAGE 17 ==================== -->
+  <div class="page" id="page-17">
     <div class="running-header">
       <span>RSRA-4B: Intrinsic Latent Verification for Frontier Reasoning</span>
       <span>Appendix A: Mathematical Foundations (Continued)</span>
