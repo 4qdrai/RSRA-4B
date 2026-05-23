@@ -266,7 +266,7 @@ def run_h100_benchmark(config: H100Config | None = None) -> dict:
     print(f"  Device     : {device}", flush=True)
     if device.type == "cuda":
         print(f"  GPU        : {torch.cuda.get_device_name(0)}", flush=True)
-        print(f"  GPU Memory : {torch.cuda.get_device_properties(0).total_mem / 1e9:.1f} GB", flush=True)
+        print(f"  GPU Memory : {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB", flush=True)
     print(f"  d_model    : {config.d_model}", flush=True)
     print(f"  Baseline   : {config.baseline_n_layers} layers", flush=True)
     print(f"  RSRA       : 1 layer, {config.rsra_train_max_iters} max iterations (variable)", flush=True)
