@@ -1,10 +1,4 @@
-import os
-import sys
-import time
-from playwright.sync_api import sync_playwright
-
-def build_html():
-    html_content = r"""<!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
@@ -1029,59 +1023,3 @@ def build_html():
 
 </body>
 </html>
-"""
-    return html_content
-
-def generate_pdf():
-    # 1. Write the HTML content to a temporary file
-    html_content = build_html()
-    html_path = os.path.abspath("docs/scientific_paper.html")
-    with open(html_path, "w", encoding="utf-8") as f:
-        f.write(html_content)
-    print(f"Successfully generated {html_path}")
-
-    # 2. Run Playwright to compile the HTML to a PDF
-    pdf_path = os.path.abspath("docs/scientific_paper.pdf")
-    print("Launching Playwright to compile PDF...")
-    
-    with sync_playwright() as p:
-        # Launch headless browser
-        browser = p.chromium.launch(headless=True)
-        # Create a new browser context
-        context = browser.new_context(
-            viewport={"width": 800, "height": 600},
-            device_scale_factor=2
-        )
-        page = context.new_page()
-        
-        # Open the local HTML file
-        file_url = f"file:///{html_path.replace(os.sep, '/')}"
-        page.goto(file_url)
-        
-        # Emulate print media style
-        page.emulate_media(media="print")
-        
-        # Wait for MathJax to finish typesetting
-        print("Waiting for MathJax to render equations...")
-        page.wait_for_function("window.mathjaxReady === true", timeout=30000)
-        
-        # Wait a small moment for rendering stabilizer
-        time.sleep(1)
-        
-        # Print to PDF with exact page sizes and no margins (since HTML padding represents margins)
-        print("Generating PDF...")
-        page.pdf(
-            path=pdf_path,
-            print_background=True,
-            width="21cm",
-            height="29.7cm",
-            margin={"top": "0", "bottom": "0", "left": "0", "right": "0"}
-        )
-        
-        browser.close()
-    
-    print(f"Successfully generated state-of-the-art PDF: {pdf_path}")
-
-if __name__ == "__main__":
-    generate_pdf()
-
