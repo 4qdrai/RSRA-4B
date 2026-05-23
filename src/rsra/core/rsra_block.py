@@ -167,6 +167,7 @@ class RSRABlock(nn.Module):
         self,
         h: torch.Tensor,
         context: torch.Tensor | None = None,
+        key_padding_mask: torch.Tensor | None = None,
     ) -> RSRABlockOutput:
         """Execute the recursive generate-check-refine loop.
 
@@ -177,6 +178,8 @@ class RSRABlock(nn.Module):
         context : torch.Tensor | None, optional
             Optional cross-level context
             ``(batch, seq_len, context_dim)``.
+        key_padding_mask : torch.Tensor | None, optional
+            Padding mask for self-attention ``(batch, seq_len)`` as ``bool``.
 
         Returns
         -------
@@ -201,7 +204,7 @@ class RSRABlock(nn.Module):
 
         for k in range(self.config.max_iterations):
             # 1. Generate
-            h_tilde = self.generator(h, context)
+            h_tilde = self.generator(h, context, key_padding_mask=key_padding_mask)
 
             # 2. Check
             v = self.checker(h_tilde)

@@ -108,6 +108,7 @@ class StateGenerator(nn.Module):
         self,
         h: torch.Tensor,
         context: torch.Tensor | None = None,
+        key_padding_mask: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """Generate a refined latent state.
 
@@ -120,6 +121,8 @@ class StateGenerator(nn.Module):
             ``(batch, seq_len, context_dim)``.
             Projected and added to *h* before self-attention when
             provided.
+        key_padding_mask : torch.Tensor | None, optional
+            Padding mask for self-attention ``(batch, seq_len)`` as ``bool``.
 
         Returns
         -------
@@ -146,7 +149,11 @@ class StateGenerator(nn.Module):
         # --- self-attention block (pre-norm) ---
         residual = x
         x_norm = self.attn_norm(x)
-        attn_out, _ = self.attn(x_norm, x_norm, x_norm, need_weights=False)
+        attn_out, _ = self.attn(
+            x_norm, x_norm, x_norm,
+            key_padding_mask=key_padding_mask,
+            need_weights=False
+        )
         x = residual + self.attn_dropout(attn_out)
 
         # --- feed-forward block (pre-norm) ---

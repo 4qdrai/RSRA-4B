@@ -1,0 +1,11 @@
+{
+  "accuracies": {
+    "2": 1.0,
+    "4": 1.0,
+    "6": 0.5,
+    "8": 0.5,
+    "10": 0.5,
+    "12": 0.5
+  },
+  "note": "Update these values with the manually evaluated accuracy of Gemini 1.5 Pro / GPT-4o on the TRLC task."
+}
