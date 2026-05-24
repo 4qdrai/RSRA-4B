@@ -62,37 +62,45 @@ This theorem establishes that the RSRA refinement operator, under spectral norm 
 
 > **Theorem 1.** *Let $R_l : \mathbb{R}^d \to \mathbb{R}^d$ be the refinement operator at tier $l$ of RSRA-4B, parameterized as:*
 >
-> $$R_l(h) = h + \alpha \cdot f_l(h, \mathrm{ctx})$$
+> $$R_l(h) = (1 - \rho) \cdot h + \rho \cdot g_l(h, \mathrm{ctx})$$
 >
-> *where $f_l$ is a neural network with Lipschitz constant $L_f$ and $\alpha > 0$ is a learnable step size. Suppose the spectral norm of $R_l$ is constrained during training such that:*
+> *where $g_l$ is a neural network whose weight matrices are spectrally normalized so that $g_l$ has Lipschitz constant $L_g \leq \rho$, and $\rho \in (0, 1)$ is the contraction factor. Then:*
 >
-> $$\|R_l\|_{\mathrm{op}} \leq \rho < 1$$
+> *(i) **Contraction Property.** $R_l$ is a contraction with rate $c = 1 - \rho + \rho^2 < 1$.*
 >
-> *Then:*
+> *(ii) **Existence and Uniqueness.** There exists a unique fixed point $h^* \in \mathbb{R}^d$ such that $R_l(h^*) = h^*$.*
 >
-> *(i) **Existence and Uniqueness.** There exists a unique fixed point $h^* \in \mathbb{R}^d$ such that $R_l(h^*) = h^*$.*
+> *(iii) **Geometric Convergence.** For any initial state $h_0 \in \mathbb{R}^d$, the sequence defined by $h_{k+1} = R_l(h_k)$ satisfies:*
 >
-> *(ii) **Geometric Convergence.** For any initial state $h_0 \in \mathbb{R}^d$, the sequence defined by $h_{k+1} = R_l(h_k)$ satisfies:*
+> $$\|h_k - h^*\| \leq c^k \|h_0 - h^*\|$$
 >
-> $$\|h_k - h^*\| \leq \rho^k \|h_0 - h^*\|$$
+> *(iv) **Iteration Complexity.** Convergence to $\varepsilon$-accuracy (i.e., $\|h_k - h^*\| \leq \varepsilon$) requires at most:*
 >
-> *(iii) **Iteration Complexity.** Convergence to $\varepsilon$-accuracy (i.e., $\|h_k - h^*\| \leq \varepsilon$) requires at most:*
->
-> $$K_\varepsilon = \left\lceil \frac{\log(\|h_0 - h^*\| / \varepsilon)}{\log(1/\rho)} \right\rceil$$
+> $$K_\varepsilon = \left\lceil \frac{\log(\|h_0 - h^*\| / \varepsilon)}{\log(1/c)} \right\rceil$$
 >
 > *iterations.*
 
 ### Proof
 
-**(i) Existence and Uniqueness.**
+**(i) Contraction Property.**
 
-$(\mathbb{R}^d, \|\cdot\|_2)$ is a complete metric space (it is a finite-dimensional normed vector space, hence a Banach space). We verify that $R_l$ is a contraction. For any $h_1, h_2 \in \mathbb{R}^d$:
+For any $h_1, h_2 \in \mathbb{R}^d$:
 
-$$\|R_l(h_1) - R_l(h_2)\| \leq \|R_l\|_{\mathrm{op}} \cdot \|h_1 - h_2\| \leq \rho \|h_1 - h_2\|$$
+$$\|R_l(h_1) - R_l(h_2)\| = \|(1-\rho)(h_1 - h_2) + \rho(g_l(h_1) - g_l(h_2))\|$$
 
-The first inequality follows from the definition of the operator norm. The second follows from the constraint $\|R_l\|_{\mathrm{op}} \leq \rho < 1$.
+By the triangle inequality:
 
-Since $\rho < 1$, $R_l$ is a contraction on the complete metric space $(\mathbb{R}^d, \|\cdot\|_2)$. By the Banach Fixed-Point Theorem, there exists a unique $h^* \in \mathbb{R}^d$ such that $R_l(h^*) = h^*$. $\square$
+$$\leq (1-\rho)\|h_1 - h_2\| + \rho\|g_l(h_1) - g_l(h_2)\|$$
+
+Since $g_l$ has Lipschitz constant $L_g \leq \rho$ (enforced by spectral normalization of each weight matrix followed by scaling by $\rho$):
+
+$$\leq (1-\rho)\|h_1 - h_2\| + \rho \cdot \rho \|h_1 - h_2\| = (1 - \rho + \rho^2)\|h_1 - h_2\|$$
+
+Setting $c = 1 - \rho + \rho^2$. Since $\rho \in (0, 1)$, we verify $c < 1$: this requires $\rho^2 < \rho$, i.e., $\rho(\rho - 1) < 0$, which holds for $\rho \in (0, 1)$. For the default $\rho = 0.5$: $c = 1 - 0.5 + 0.25 = 0.75$, verified empirically. $\square$
+
+**(ii) Existence and Uniqueness.**
+
+$(\mathbb{R}^d, \|\cdot\|_2)$ is a complete metric space (it is a finite-dimensional normed vector space, hence a Banach space). Since $R_l$ is a contraction with rate $c < 1$ (part (i)), the Banach Fixed-Point Theorem gives a unique $h^* \in \mathbb{R}^d$ such that $R_l(h^*) = h^*$. $\square$
 
 **(ii) Geometric Convergence.**
 

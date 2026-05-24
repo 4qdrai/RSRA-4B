@@ -19,14 +19,29 @@ Modern large language models generate tokens blindly — each hidden state is co
 
 ---
 
-## 🎯 Key Results
+## Key Results
 
 | Metric | Value | Significance |
 |--------|-------|-------------|
-| **KV-Cache Reduction** | **85%** vs standard chain-of-thought | Latent recursion generates zero intermediate tokens |
+| **KV-Cache Scaling** | **O(1) memory with reasoning depth** | Latent recursion generates zero intermediate tokens (see operating-point analysis below) |
 | **Convergence Guarantees** | **Dual:** Banach contraction + monotone operator | Strongest formal guarantees in the field — no competitor offers both |
-| **Reasoning Preservation** | **>30× improvement** at 100 reasoning steps | Standard: 0.6% accuracy → RSRA-4B: >19.7% (conservative) to >68% (multi-tier) |
-| **Stage 1 Compute** | **€37,500** (~15K H100-hrs) | 1.25% of €3M budget — frees 98.75% for talent & data |
+| **Reasoning Preservation** | **>30x improvement** at 100 reasoning steps | Standard: 0.6% accuracy -> RSRA-4B: >19.7% (conservative) to >68% (multi-tier) |
+| **Parameter Efficiency** | **4.75x fewer parameters** | RSRA 4.0M params vs baseline 19.1M params with comparable accuracy on TRLC (H100 benchmark) |
+| **Stage 1 Compute** | **EUR 37,500** (~15K H100-hrs) | 1.25% of EUR 3M budget — frees 98.75% for talent & data |
+
+### KV-Cache Memory Reduction: Operating-Point Analysis
+
+The KV-cache advantage of latent recursion is **O(1) with respect to reasoning depth** — unlike chain-of-thought, which grows linearly. However, the percentage reduction depends on the ratio of reasoning depth to prompt length:
+
+| Reasoning Depth | Prompt Length | CoT KV-cache | RSRA KV-cache | Reduction |
+|:-:|:-:|:-:|:-:|:-:|
+| 1000 | 64 | 1064 slots | 64 slots | **~94%** |
+| 100 | 64 | 164 slots | 64 slots | **~61%** |
+| 100 | 512 | 612 slots | 512 slots | **~16%** |
+| 10 | 512 | 522 slots | 512 slots | **~2%** |
+| 10 | 64 | 74 slots | 64 slots | **~14%** |
+
+> **Key insight:** The benefit is largest when reasoning depth >> prompt length. At realistic operating points (depth=10, prompt=512), the reduction is only ~2%. The principled claim is that RSRA achieves **O(1) memory scaling with reasoning depth**, which is true regardless of prompt length.
 
 ---
 
@@ -117,7 +132,7 @@ Generate all evidence figures used in the documentation:
 # Convergence analysis — validates Banach contraction dynamics
 python -m rsra.simulations.convergence_analysis
 
-# KV-cache memory profiling — demonstrates 85% reduction
+# KV-cache memory profiling — demonstrates O(1) scaling with reasoning depth
 python -m rsra.simulations.kv_cache_profiling
 
 # Reasoning decay comparison — standard vs. RSRA-4B error compounding
@@ -131,45 +146,108 @@ Generated figures are saved to `figures/` and referenced throughout the document
 
 ---
 
-## 📈 Empirical Validation & Live Benchmarks
+## Empirical Validation & Live Benchmarks
 
-To empirically validate the RSRA-4B architecture under rigorous head-to-head conditions, we implemented and ran a full training and evaluation pipeline comparing it against a standard baseline Transformer on a hard reasoning task.
+To empirically validate the RSRA-4B architecture under rigorous head-to-head conditions, we implemented and ran a full training and evaluation pipeline comparing RSRA against a standard baseline Transformer on hard reasoning tasks. All results below are sourced directly from the result files in `results/`.
 
-### 🧠 The Validation Concept: Extrapolation Difficulty
-Simple benchmarks often fail to distinguish between **memorization** (learning specific patterns) and **reasoning** (learning how to solve logic rules). To ensure our models are actually learning deductive reasoning, we use the concept of **Extrapolation Difficulty**:
-1. **Training Regime:** Models are trained on simple, medium-sized puzzles with $N = 3$ to $N = 9$ boolean variables.
-2. **Validation/Testing Regime:** Models are tested on larger, unseen puzzles with $N = 10$ variables.
-3. **The Test:** If a model only memorized pattern mappings, its performance will tank when encountering the larger $N=10$ variables. If it learned the core logic of step-by-step reasoning, it will generalize and solve the harder problems.
+### The TRLC Benchmark (H100 GPU)
 
-### 🧩 The Task: Constraint Satisfaction Problems (CSP)
-We chose the **Boolean Constraint Satisfaction Problem (CSP)** &mdash; essentially a randomized boolean algebra puzzle (Sudoku for AI) &mdash; as our primary benchmark.
-* **The Rules:** The model is given $N$ variables and $K$ random logical rules connecting them using operators like `AND`, `OR`, `XOR`, `IMPLIES`, and `NAND` (along with random `NOT` negations).
-* **The Goal:** The model must decide: (1) Is the puzzle satisfiable (does a solution exist)? (2) If yes, output the exact assignment for all $N$ variables.
-* **Why CSP?** Solving a CSP cannot be done in a single forward pass; it requires picking variables, propagating the logic, checking for contradictions, and refining the state. This is exactly where RSRA's recursive generate $\to$ check $\to$ refine loop outperforms traditional models.
+**Source:** `results/h100_benchmark/benchmark_results.json`
+**Hardware:** NVIDIA H100 PCIe
 
-### 📊 Live Benchmark Results
-Our live Head-to-Head CSP training run (**80 epochs**) completed with the following results:
+We trained both architectures on a Temporal Reasoning with Logical Constraints (TRLC) task using a 3-phase curriculum (N=2-3, then N=2-5, then N=2-8 with distractors), for 45 epochs total.
 
-| Metric | Standard Baseline | RSRA-4B (Ours) | Difference / Advantage |
-|--------|-------------------|----------------|-----------------------|
-| **Parameters** | 212,929 | **73,730** | **~3× fewer parameters** |
-| **Training Time** | **1,099.3s** | 1,559.3s | Standard is faster per-epoch |
-| **Test Loss** | **1.4842** | 1.5680 | Comparable convergence |
-| **Overall Test Accuracy** | 80.0% | **80.2%** | **RSRA-4B wins with 1/3 of parameters** |
-| **Extrapolation ($N=10$)** | **87.1%** | 84.3% | Comparable generalization |
+#### Model Configuration
 
-### 🔍 Result Interpretation
+| Parameter | Value |
+|-----------|-------|
+| d_model | 512 |
+| n_heads | 8 |
+| d_ff | 2048 |
+| Baseline layers | 6 |
+| RSRA max iters (train/eval) | 10 / 20 |
 
-1. **Extreme Parameter Efficiency (~3× Advantage):**
-   The most significant result is parameter efficiency. RSRA-4B achieved **80.2% accuracy using only 73,730 parameters**, whereas the Standard Transformer required **212,929 parameters** (almost 3 times more!) to reach a comparable 80.0%. This is a direct empirical proof of RSRA-4B's **recursive weight-sharing efficiency**: it reuses its weights to perform deeper computations rather than adding more parameters.
-   
-2. **Comparable Extrapolation Generalization:**
-   At the hard extrapolation boundary ($N=10$), RSRA-4B matched the standard baseline within a very narrow margin ($84.3\%$ vs $87.1\%$) while using only a fraction of the capacity.
-   
+#### Parameter Efficiency
+
+| Model | Parameters | Ratio |
+|-------|-----------|-------|
+| Standard Baseline | 19,125,761 | 1x |
+| **RSRA-4B** | **4,023,298** | **~4.75x fewer** |
+
+#### Training Results (Best Validation Accuracy per Phase)
+
+| Phase | Baseline Best Val Acc | RSRA Best Val Acc |
+|-------|----------------------|-------------------|
+| Phase 1 (N=2-3) | 100.0% | 100.0% |
+| Phase 2 (N=2-5) | 100.0% | 100.0% |
+| Phase 3 (N=2-8, +distractors) | 67.6% | 68.35% |
+
+Both models achieve perfect accuracy on simpler problems. On the hardest phase (with distractors), RSRA-4B slightly edges out the baseline (68.35% vs 67.6%) while using ~4.75x fewer parameters.
+
+#### Extrapolation Results (Tested at eval with 20 iterations)
+
+| N (variables) | Baseline Acc | RSRA Acc |
+|:---:|:---:|:---:|
+| 2 | 78.5% | 78.9% |
+| 3 | 70.4% | 50.2% |
+| 4 | 52.6% | 50.0% |
+| 5 | 55.3% | 50.2% |
+| 6 | 50.7% | 56.8% |
+| 7 | 50.2% | 50.0% |
+| 8 | 50.6% | 50.5% |
+| 10 | 52.2% | 50.5% |
+| 12 | 74.1% | 54.1% |
+| 15 | 50.3% | 64.3% |
+
+> **Honest assessment:** Extrapolation performance is near chance level for both models at most out-of-distribution sizes. Neither model has learned robust generalizable reasoning on this task yet. The non-monotonic patterns (e.g., baseline 74.1% at N=12, RSRA 64.3% at N=15) likely reflect spurious correlations rather than systematic generalization. This is expected for a proof-of-concept training run and motivates further work on curriculum design and training scale.
+
+#### Distractor Robustness
+
+| Distractor Count | Baseline Acc | RSRA Acc |
+|:---:|:---:|:---:|
+| 0 | 53.1% | 50.0% |
+| 5 | 57.2% | 58.2% |
+| 20 | 50.0% | 50.1% |
+| 50 | 50.8% | 49.0% |
+
+> Both models are near chance on most distractor conditions. RSRA slightly outperforms on the 5-distractor case.
+
+### Algorithmic Benchmark (Parity & Addition)
+
+**Source:** `results/algorithmic_benchmark/algorithmic_results.json`
+
+These tasks were tested with only 2 training epochs as an early feasibility check.
+
+#### Parity Task
+
+| Model | Parameters | Extrapolation (len=8) | Extrapolation (len=16) |
+|-------|-----------|:---:|:---:|
+| RSRA | 20,354 | 50.0% | 50.0% |
+| Small Baseline | 26,081 | 50.0% | 50.0% |
+| Large Baseline | 119,425 | 48.0% | 42.0% |
+
+#### Addition Verification Task
+
+| Model | Parameters | Extrapolation (4-bit) | Extrapolation (8-bit) |
+|-------|-----------|:---:|:---:|
+| RSRA | 20,418 | 50.0% | 50.0% |
+| Small Baseline | 26,145 | 50.0% | 50.0% |
+| Large Baseline | 119,553 | 50.0% | 50.0% |
+
+> **Note:** All models are at chance level. This run used only 2 training epochs and serves as a baseline for future extended training. No conclusions about reasoning capability should be drawn from these results.
+
+### Key Takeaways
+
+1. **Parameter Efficiency (~4.75x Advantage):**
+   The most significant validated result is parameter efficiency. On the TRLC benchmark, RSRA-4B matched or slightly exceeded the baseline's accuracy (68.35% vs 67.6% on the hardest phase) while using **4.75x fewer parameters** (4.0M vs 19.1M). This is a direct empirical signal for RSRA-4B's recursive weight-sharing efficiency.
+
+2. **Extrapolation is an Open Problem:**
+   Neither architecture demonstrates robust out-of-distribution generalization on the TRLC task. Both hover near chance for most unseen sizes. This is honest and expected for a proof-of-concept — scaling training duration, data, and model size is the next step.
+
 3. **Execution Cost (Tradeoff):**
-   RSRA-4B takes longer to train (~1559s vs ~1099s) because it runs multiple refinement iterations in latent space per token. This represents a classic computer science tradeoff: **we exchange extra training/inference time (compute) for a massive reduction in model size (memory/parameters).**
+   RSRA-4B uses more wall-clock time per epoch because it runs multiple refinement iterations in latent space. This is the classic space-time tradeoff: **extra inference compute is exchanged for a massive reduction in model size.**
 
-You can find the generated Head-to-Head validation charts inside the `figures/` folder:
+You can find the generated validation charts inside the `figures/` folder:
 * `figures/benchmark_accuracy.png` (Training and test accuracy curves)
 * `figures/benchmark_compute.png` (Compute steps dynamically allocated per token)
 * `figures/benchmark_convergence.png` (Validation of Banach convergence times)

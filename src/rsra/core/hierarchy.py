@@ -71,7 +71,7 @@ class TierConfig:
     max_iterations: int
     dropout: float = 0.0
     constraint: ConstraintMode = ConstraintMode.BANACH
-    contraction_factor: float = 0.9
+    contraction_factor: float = 0.5
 
 
 @dataclass
