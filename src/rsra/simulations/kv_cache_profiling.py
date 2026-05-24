@@ -314,7 +314,7 @@ def plot_kv_cache_scaling(
     fig.savefig(save_path, dpi=300, bbox_inches="tight",
                 facecolor="white", edgecolor="none")
     plt.close(fig)
-    print(f"  ✓ Saved KV-cache scaling figure → {save_path}")
+    print(f"  [+] Saved KV-cache scaling figure -> {save_path}")
 
 
 def plot_kv_cache_reduction(
@@ -369,7 +369,7 @@ def plot_kv_cache_reduction(
     fig.savefig(save_path, dpi=300, bbox_inches="tight",
                 facecolor="white", edgecolor="none")
     plt.close(fig)
-    print(f"  ✓ Saved KV-cache reduction figure → {save_path}")
+    print(f"  [+] Saved KV-cache reduction figure -> {save_path}")
 
 
 # ── Main Runner ──────────────────────────────────────────────────────────────
@@ -396,20 +396,20 @@ def run_kv_cache_profiling(
     figures_dir.mkdir(parents=True, exist_ok=True)
 
     print("=" * 72)
-    print("  RSRA-4B  ·  KV-Cache Memory Profiling")
+    print("  RSRA-4B  -  KV-Cache Memory Profiling")
     print("=" * 72)
 
-    # ── Profile all model sizes ──
-    print("\n▸ Profiling KV-cache memory across model sizes...")
+    # -- Profile all model sizes --
+    print("\n* Profiling KV-cache memory across model sizes...")
     profiles = []
     for d_model in MODEL_SIZES:
         profile = profile_kv_cache(d_model=d_model)
         profiles.append(profile)
-        print(f"  d_model={d_model:>5d}  │  profiled {len(REASONING_DEPTHS)}"
+        print(f"  d_model={d_model:>5d}  |  profiled {len(REASONING_DEPTHS)}"
               f" reasoning depths")
 
-    # ── Generate figures ──
-    print("\n▸ Generating publication-quality figures...")
+    # -- Generate figures --
+    print("\n* Generating publication-quality figures...")
     plot_kv_cache_scaling(
         profiles,
         save_path=figures_dir / "kv_cache_scaling.png",
@@ -419,68 +419,68 @@ def run_kv_cache_profiling(
         save_path=figures_dir / "kv_cache_reduction.png",
     )
 
-    # ── Print detailed table ──
-    print("\n" + "─" * 80)
+    # -- Print detailed table --
+    print("\n" + "-" * 80)
     print("  KV-CACHE MEMORY COMPARISON TABLE (d_model=2048, "
           f"n_layers={DEFAULT_N_LAYERS}, FP16)")
-    print("─" * 80)
+    print("-" * 80)
     primary = next(
         (p for p in profiles if p.d_model == 2048), profiles[-1]
     )
     header = (
-        f"{'Depth':>6s}  │  {'Standard (MB)':>14s}  │  "
-        f"{'RSRA-4B (MB)':>13s}  │  {'Reduction':>10s}"
+        f"{'Depth':>6s}  |  {'Standard (MB)':>14s}  |  "
+        f"{'RSRA-4B (MB)':>13s}  |  {'Reduction':>10s}"
     )
     print(header)
-    print("─" * 80)
+    print("-" * 80)
     for i, depth in enumerate(primary.reasoning_depths):
         print(
-            f"{depth:>6d}  │  "
-            f"{primary.standard_memory_mb[i]:>14.2f}  │  "
-            f"{primary.rsra_memory_mb[i]:>13.2f}  │  "
+            f"{depth:>6d}  |  "
+            f"{primary.standard_memory_mb[i]:>14.2f}  |  "
+            f"{primary.rsra_memory_mb[i]:>13.2f}  |  "
             f"{primary.reduction_pct[i]:>9.1f}%"
         )
-    print("─" * 80)
+    print("-" * 80)
 
-    # ── Validate the 85% claim ──
+    # -- Validate the 85% claim --
     idx_10 = np.where(primary.reasoning_depths == 10)[0]
     if len(idx_10) > 0:
         reduction_at_10 = primary.reduction_pct[idx_10[0]]
         claim_validated = reduction_at_10 >= 85.0
-        status = "✓ VALIDATED" if claim_validated else "✗ NOT MET"
+        status = "VALIDATED" if claim_validated else "NOT MET"
         print(f"\n  CLAIM VALIDATION: '85% less KV-cache memory at "
               f"10 recursions'")
-        print(f"  → Actual reduction: {reduction_at_10:.1f}%  "
+        print(f"  -> Actual reduction: {reduction_at_10:.1f}%  "
               f"[{status}]")
     else:
-        print("\n  ⚠ Depth=10 not in profiling sweep; cannot validate.")
+        print("\n  [!] Depth=10 not in profiling sweep; cannot validate.")
 
-    # ── Extended table for all model sizes ──
-    print("\n" + "─" * 80)
+    # -- Extended table for all model sizes --
+    print("\n" + "-" * 80)
     print("  REDUCTION PERCENTAGE ACROSS MODEL SIZES AT KEY DEPTHS")
-    print("─" * 80)
+    print("-" * 80)
     header2 = f"{'d_model':>8s}"
     for d in [1, 10, 50, 100, 200]:
-        header2 += f"  │  {'N='+str(d):>8s}"
+        header2 += f"  |  {'N='+str(d):>8s}"
     print(header2)
-    print("─" * 80)
+    print("-" * 80)
 
     for profile in profiles:
         row = f"{profile.d_model:>8d}"
         for d in [1, 10, 50, 100, 200]:
             idx = np.where(profile.reasoning_depths == d)[0]
             if len(idx) > 0:
-                row += f"  │  {profile.reduction_pct[idx[0]]:>7.1f}%"
+                row += f"  |  {profile.reduction_pct[idx[0]]:>7.1f}%"
             else:
-                row += f"  │  {'N/A':>8s}"
+                row += f"  |  {'N/A':>8s}"
         print(row)
-    print("─" * 80)
+    print("-" * 80)
 
     print("\n  KEY FINDINGS:")
-    print("  • RSRA-4B KV-cache memory is CONSTANT w.r.t. reasoning depth")
-    print("  • Memory reduction increases monotonically with depth")
-    print("  • Reduction percentage is independent of d_model (architectural)")
-    print("  • At depth=200, reduction exceeds 95% for all model sizes")
+    print("  * RSRA-4B KV-cache memory is CONSTANT w.r.t. reasoning depth")
+    print("  * Memory reduction increases monotonically with depth")
+    print("  * Reduction percentage is independent of d_model (architectural)")
+    print("  * At depth=200, reduction exceeds 95% for all model sizes")
     print("=" * 72)
 
     return profiles
