@@ -48,6 +48,7 @@ from rsra.benchmarks.baseline_transformer import (
     BaselineTransformer,
 )
 from rsra.core.rsra_block import RSRABlock, RSRABlockConfig
+from rsra.core.joint_loss_classification import JointLossClassification
 
 
 # ======================================================================
@@ -123,13 +124,24 @@ def train_one_epoch_variable_iters(
     optimizer: torch.optim.Optimizer,
     device: torch.device,
     config: H100Config,
-) -> tuple[float, float]:
-    """Train RSRA with variable iteration count per batch."""
+) -> tuple[float, float, dict[str, float]]:
+    """Train RSRA with variable iteration count and joint loss.
+
+    Returns (avg_total_loss, avg_iters, loss_components_dict).
+    """
     model.train()
     total_loss = 0.0
     total_iters = 0.0
     n_batches = 0
-    criterion = nn.BCELoss()
+    # Components for logging
+    sum_bce = 0.0
+    sum_checker = 0.0
+    sum_flops = 0.0
+
+    criterion = JointLossClassification(
+        gamma=0.5,
+        lambda_flops=0.01,
+    )
 
     for token_ids, labels, _ in loader:
         token_ids = token_ids.to(device)
@@ -143,7 +155,15 @@ def train_one_epoch_variable_iters(
 
         logits, iters, scores = model(token_ids)
 
-        loss = criterion(logits, labels)
+        # Joint loss: BCE + checker supervision + FLOPs penalty
+        loss_dict = criterion(
+            logits=logits,
+            targets=labels,
+            checker_scores=scores,
+            iterations_used=iters,
+            max_iterations=model.rsra_block.config.max_iterations,
+        )
+        loss = loss_dict["total_loss"]
 
         optimizer.zero_grad()
         loss.backward()
@@ -153,10 +173,19 @@ def train_one_epoch_variable_iters(
         total_loss += loss.item()
         total_iters += iters
         n_batches += 1
+        sum_bce += loss_dict["bce_loss"].item()
+        sum_checker += loss_dict["checker_loss"].item()
+        sum_flops += loss_dict["flops_penalty"].item()
 
-    avg_loss = total_loss / max(1, n_batches)
-    avg_iters = total_iters / max(1, n_batches)
-    return avg_loss, avg_iters
+    nb = max(1, n_batches)
+    avg_loss = total_loss / nb
+    avg_iters = total_iters / nb
+    components = {
+        "bce": sum_bce / nb,
+        "checker": sum_checker / nb,
+        "flops": sum_flops / nb,
+    }
+    return avg_loss, avg_iters, components
 
 
 def train_one_epoch_baseline(
@@ -363,9 +392,9 @@ def run_h100_benchmark(config: H100Config | None = None) -> dict:
             base_loss = train_one_epoch_baseline(baseline, train_loader, base_opt, device)
             base_train_time = time.time() - t0
 
-            # Train RSRA with variable iterations
+            # Train RSRA with variable iterations + joint loss
             t0 = time.time()
-            rsra_loss, rsra_iters = train_one_epoch_variable_iters(rsra, train_loader, rsra_opt, device, config)
+            rsra_loss, rsra_iters, rsra_components = train_one_epoch_variable_iters(rsra, train_loader, rsra_opt, device, config)
             rsra_train_time = time.time() - t0
 
             # Evaluate
@@ -380,6 +409,9 @@ def run_h100_benchmark(config: H100Config | None = None) -> dict:
                 "epoch": global_epoch, "phase": phase_idx + 1,
                 "loss": rsra_loss, "val_acc": rsra_val_acc,
                 "avg_iters": rsra_iters, "time": rsra_train_time,
+                "bce_loss": rsra_components["bce"],
+                "checker_loss": rsra_components["checker"],
+                "flops_penalty": rsra_components["flops"],
             })
 
             if (epoch + 1) % 3 == 0 or epoch == phase_epochs - 1:
@@ -387,6 +419,7 @@ def run_h100_benchmark(config: H100Config | None = None) -> dict:
                     f"    Epoch {global_epoch+1:02d} | "
                     f"Base: loss={base_loss:.4f} acc={base_val_acc:.1%} ({base_train_time:.1f}s) | "
                     f"RSRA: loss={rsra_loss:.4f} acc={rsra_val_acc:.1%} iters={rsra_iters:.1f} ({rsra_train_time:.1f}s) | "
+                    f"[bce={rsra_components['bce']:.4f} chk={rsra_components['checker']:.4f} flop={rsra_components['flops']:.3f}] | "
                     f"lr={lr:.2e}",
                     flush=True
                 )

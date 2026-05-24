@@ -1,0 +1,110 @@
+{
+  "parity": {
+    "task": "parity",
+    "params": {
+      "rsra": 20354,
+      "small_baseline": 26081,
+      "large_baseline": 119425
+    },
+    "training_log": {
+      "rsra": [
+        {
+          "loss": 0.8418727431978498,
+          "bce": 0.7064099141529628,
+          "checker": 0.2509256729057857,
+          "avg_iters": 4.0
+        },
+        {
+          "loss": 0.8341052872794015,
+          "bce": 0.6988545060157776,
+          "checker": 0.25050160714558195,
+          "avg_iters": 4.714285714285714
+        }
+      ],
+      "small_baseline": [
+        {
+          "loss": 0.6963772944041661
+        },
+        {
+          "loss": 0.6946415305137634
+        }
+      ],
+      "large_baseline": [
+        {
+          "loss": 0.7061007278306144
+        },
+        {
+          "loss": 0.6911163755825588
+        }
+      ]
+    },
+    "extrapolation": {
+      "len_8": {
+        "rsra_acc": 0.5,
+        "rsra_iters": 20.0,
+        "small_baseline_acc": 0.5,
+        "large_baseline_acc": 0.48
+      },
+      "len_16": {
+        "rsra_acc": 0.5,
+        "rsra_iters": 20.0,
+        "small_baseline_acc": 0.5,
+        "large_baseline_acc": 0.42
+      }
+    }
+  },
+  "addition": {
+    "task": "addition_verification",
+    "params": {
+      "rsra": 20418,
+      "small_baseline": 26145,
+      "large_baseline": 119553
+    },
+    "training_log": {
+      "rsra": [
+        {
+          "loss": 0.853591092995235,
+          "bce": 0.7158188053539821,
+          "checker": 0.2555445943559919,
+          "avg_iters": 7.142857142857143
+        },
+        {
+          "loss": 0.8487393515450614,
+          "bce": 0.711537412234715,
+          "checker": 0.2544039168528148,
+          "avg_iters": 5.857142857142857
+        }
+      ],
+      "small_baseline": [
+        {
+          "loss": 0.6882249883243016
+        },
+        {
+          "loss": 0.6877694129943848
+        }
+      ],
+      "large_baseline": [
+        {
+          "loss": 0.692696349961417
+        },
+        {
+          "loss": 0.6804423417363848
+        }
+      ]
+    },
+    "extrapolation": {
+      "bits_4": {
+        "rsra_acc": 0.5,
+        "rsra_iters": 20.0,
+        "small_baseline_acc": 0.5,
+        "large_baseline_acc": 0.5
+      },
+      "bits_8": {
+        "rsra_acc": 0.5,
+        "rsra_iters": 20.0,
+        "small_baseline_acc": 0.5,
+        "large_baseline_acc": 0.5
+      }
+    }
+  }
+}

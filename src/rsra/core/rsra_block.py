@@ -80,7 +80,7 @@ class RSRABlockConfig:
     checker_hidden: int | None = None
     refiner_hidden: int | None = None
     constraint: ConstraintMode = ConstraintMode.BANACH
-    contraction_factor: float = 0.9
+    contraction_factor: float = 0.5
     context_dim: int | None = None
 
 
@@ -190,10 +190,9 @@ class RSRABlock(nn.Module):
         Notes
         -----
         During training the loop always unrolls for *all*
-        ``max_iterations`` to allow gradient flow through every
-        path.  The ``accepted`` flag indicates whether the checker
-        passed before exhausting iterations, but the loop continues
-        regardless so that the backward pass is well-defined.
+        ``max_iterations`` to allow gradient flow.  The output is the
+        **best accepted state** (highest mean checker score ≥ τ), or
+        the last generated state if no iteration was accepted.
 
         At inference time (``torch.no_grad()`` context), the loop
         terminates early when the checker passes.
@@ -201,6 +200,8 @@ class RSRABlock(nn.Module):
         scores: list[torch.Tensor] = []
         accepted = False
         iters = 0
+        best_state: torch.Tensor | None = None
+        best_score: float = -1.0
 
         for k in range(self.config.max_iterations):
             # 1. Generate
@@ -211,28 +212,34 @@ class RSRABlock(nn.Module):
             scores.append(v)
             iters = k + 1
 
-            # 3. Accept or refine
+            # 3. Compute acceptance score (active positions only)
             if key_padding_mask is not None:
-                # key_padding_mask has True for padding positions (shape: B, S)
-                active_mask = ~key_padding_mask  # True for active positions
-                active_mask = active_mask.unsqueeze(-1)  # (B, S, 1)
-                active_v = v[active_mask]
+                active_mask = ~key_padding_mask
+                active_mask_3d = active_mask.unsqueeze(-1)
+                active_v = v[active_mask_3d]
                 mean_score = active_v.mean().item() if active_v.numel() > 0 else 0.0
             else:
                 mean_score = v.mean().item()
 
+            # 4. Track best accepted state
             if mean_score >= self.config.tau:
                 accepted = True
+                if mean_score > best_score:
+                    best_state = h_tilde
+                    best_score = mean_score
                 if not self.training:
                     # Early exit at inference time
                     break
 
-            # 4. Refine for next iteration (or for training grad flow)
+            # 5. Refine for next iteration
             if k < self.config.max_iterations - 1:
                 h = self.refiner(h_tilde, v)
 
+        # Return best accepted state, or last generated if never accepted
+        output = best_state if best_state is not None else h_tilde
+
         return RSRABlockOutput(
-            output_state=h_tilde,  # type: ignore[possibly-undefined]
+            output_state=output,
             checker_scores=scores,
             iterations_used=iters,
             accepted=accepted,

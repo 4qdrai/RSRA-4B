@@ -29,7 +29,7 @@ from typing import Optional
 
 import torch
 import torch.nn as nn
-from torch.nn.utils import spectral_norm
+from torch.nn.utils.parametrizations import spectral_norm
 
 
 class ConstraintMode(enum.Enum):
@@ -145,7 +145,7 @@ class RefinementOperator(nn.Module):
         d_model: int,
         d_hidden: int | None = None,
         constraint: ConstraintMode = ConstraintMode.BANACH,
-        contraction_factor: float = 0.9,
+        contraction_factor: float = 0.5,
         dropout: float = 0.0,
     ) -> None:
         super().__init__()
@@ -219,30 +219,76 @@ class RefinementOperator(nn.Module):
         torch.Tensor
             Refined state ``h_refined`` of the same shape as
             ``h_tilde``.
+
+        Notes
+        -----
+        The output is a **proper contraction mapping** of ``h_tilde``.
+        With spectral normalisation on ``fc1`` and ``fc2`` (each has
+        operator norm ≤ 1) and scaling by ``contraction_factor`` ρ:
+
+        .. math::
+
+            \\|R(x) - R(y)\\| \\leq \\rho \\, \\|x - y\\|
+
+        guaranteeing Banach fixed-point convergence.
+
+        Previous versions used a residual connection
+        ``h_tilde + delta``, giving a Lipschitz constant of
+        ``1 + ρ ≈ 1.9`` — which violates the contraction requirement.
+
+        The current implementation guarantees contraction by:
+
+        1. **Removing LayerNorm** from the MLP path in Banach mode
+           (LayerNorm has unbounded Lipschitz constant ≈ 5x empirically)
+        2. Using spectral-normalised ``fc1`` and ``fc2`` (L ≤ 1 each)
+        3. Scaling the MLP output by ``ρ`` to get ``L_g ≤ ρ``
+        4. Blending with identity: ``R(h) = (1-ρ)·h + ρ·g(h)``
+
+        The overall Lipschitz constant is:
+
+        .. math::
+
+            \\|R(x) - R(y)\\| \\leq (1-\\rho + \\rho \\cdot L_g) \\|x-y\\|
+            \\leq (1 - \\rho + \\rho^2) \\|x - y\\| < \\|x - y\\|
+
+        Since ``1 - ρ + ρ² < 1`` for ``ρ ∈ (0, 1)`` ✓
         """
-        x = self.norm(h_tilde)
-        # Concatenate checker feedback
+        # --- Compute correction via MLP ---
+        # CRITICAL: No LayerNorm for BANACH/DUAL modes!
+        # LayerNorm has Lipschitz constant >> 1 which breaks contraction.
+        # For MONOTONE-only mode, LayerNorm is safe (no contraction needed).
+        if self.constraint in (ConstraintMode.MONOTONE,):
+            x = self.norm(h_tilde)
+        else:
+            x = h_tilde
+
         x = torch.cat([x, v], dim=-1)  # (..., d_model + 1)
 
         x = self.act(self.fc1(x))
         x = self.drop(x)
-        delta = self.fc2(x)  # (..., d_model)
-
-        # --- Apply constraint-specific scaling ---
-        if self.constraint in (
-            ConstraintMode.BANACH,
-            ConstraintMode.DUAL,
-        ):
-            delta = delta * self.contraction_factor
+        g_h = self.fc2(x)  # (..., d_model)
 
         if self.constraint in (
             ConstraintMode.MONOTONE,
             ConstraintMode.DUAL,
         ):
-            delta = self.monotone(delta)
+            g_h = self.monotone(g_h)
 
-        # Residual connection: h_refined = h_tilde + contraction(delta)
-        return h_tilde + delta
+        # --- Apply contraction scaling ---
+        if self.constraint in (
+            ConstraintMode.BANACH,
+            ConstraintMode.DUAL,
+        ):
+            # Scale MLP output by ρ to get Lipschitz ≤ ρ < 1
+            g_h = g_h * self.contraction_factor
+
+        # --- Contraction via convex combination ---
+        # R(h) = (1 - ρ)·h + ρ·g(h) where ||g(x)-g(y)|| ≤ ρ·||x-y||
+        # ||R(x) - R(y)|| ≤ (1-ρ)||x-y|| + ρ·ρ·||x-y|| = (1-ρ+ρ²)||x-y||
+        # For ρ=0.5: c = 0.75 < 1 ✓
+        rho = self.contraction_factor
+        return (1.0 - rho) * h_tilde + rho * g_h
+
 
     # ------------------------------------------------------------------
     # Diagnostics
@@ -263,16 +309,10 @@ class RefinementOperator(nn.Module):
         ):
             for name in ("fc1", "fc2"):
                 layer = getattr(self, name)
-                # spectral_norm stores the sigma value
-                if hasattr(layer, "weight_orig"):
-                    with torch.no_grad():
-                        u = layer.weight_u  # type: ignore[attr-defined]
-                        v_vec = layer.weight_v  # type: ignore[attr-defined]
-                        w = layer.weight_orig  # type: ignore[attr-defined]
-                        sigma = torch.dot(
-                            u, torch.mv(w, v_vec)
-                        )
-                        norms[name] = sigma.item()
+                with torch.no_grad():
+                    w = layer.weight
+                    sigma = torch.linalg.svdvals(w)[0]
+                    norms[name] = sigma.item()
         return norms
 
     def extra_repr(self) -> str:

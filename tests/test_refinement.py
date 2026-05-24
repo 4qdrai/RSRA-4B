@@ -65,9 +65,9 @@ class TestBanachMode:
     def test_spectral_norm_hooks_present(
         self, banach_refiner: RefinementOperator
     ) -> None:
-        """fc1 and fc2 should have spectral_norm hooks."""
-        assert hasattr(banach_refiner.fc1, "weight_orig")
-        assert hasattr(banach_refiner.fc2, "weight_orig")
+        """fc1 and fc2 should have spectral_norm parametrizations."""
+        assert hasattr(banach_refiner.fc1, "parametrizations")
+        assert hasattr(banach_refiner.fc2, "parametrizations")
 
     def test_effective_spectral_norm_bounded(
         self, banach_refiner: RefinementOperator
@@ -129,7 +129,7 @@ class TestDualMode:
     def test_has_spectral_norm_and_monotone(
         self, dual_refiner: RefinementOperator
     ) -> None:
-        assert hasattr(dual_refiner.fc1, "weight_orig")
+        assert hasattr(dual_refiner.fc1, "parametrizations")
         assert dual_refiner.monotone is not None
 
     def test_psd_in_dual(
@@ -254,6 +254,10 @@ class TestGradientFlow:
         out.sum().backward()
         for name, p in banach_refiner.named_parameters():
             if p.requires_grad:
+                # LayerNorm is intentionally bypassed in Banach mode
+                # so its parameters won't receive gradients
+                if 'norm.' in name:
+                    continue
                 assert p.grad is not None, f"No grad for {name}"
 
 

@@ -190,6 +190,9 @@ class TestGradientFlow:
         loss.backward()
         for name, p in block.named_parameters():
             if p.requires_grad:
+                # LayerNorm in refiner is bypassed in Banach mode
+                if 'refiner.norm.' in name:
+                    continue
                 assert p.grad is not None, (
                     f"No grad for {name}"
                 )
