@@ -109,7 +109,7 @@ class TestTRLCModelWrapper:
         batch_size = 4
         dummy_tokens = torch.randint(1, vocab_size - 1, (batch_size, max_seq_len))
         
-        preds, iters, _ = model(dummy_tokens)
+        preds, iters, _, _ = model(dummy_tokens)
         assert preds.shape == (batch_size, 1)
         assert 0 <= iters <= 5
         assert torch.all(preds >= 0.0) and torch.all(preds <= 1.0)

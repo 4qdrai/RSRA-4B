@@ -49,7 +49,7 @@ from rsra.benchmarks.algorithmic_models import (
     BaselineForAlgorithmic,
 )
 from rsra.core.rsra_block import RSRABlock, RSRABlockConfig
-from rsra.core.joint_loss_classification import JointLossClassification
+from rsra.core.joint_loss_classification import JointLossClassification, TauScheduler
 
 
 # ======================================================================
@@ -110,12 +110,13 @@ def train_rsra_epoch(
     device: torch.device,
     max_iters: int,
 ) -> dict[str, float]:
-    """Train RSRA for one epoch with joint loss."""
+    """Train RSRA for one epoch with multi-signal joint loss."""
     model.train()
     total_loss = 0.0
     total_bce = 0.0
     total_chk = 0.0
     total_iters = 0.0
+    total_target = 0.0
     n = 0
 
     for token_ids, labels, _ in loader:
@@ -126,12 +127,13 @@ def train_rsra_epoch(
         k = random.randint(2, max_iters)
         model.rsra_block.config.max_iterations = k
 
-        logits, iters, scores = model(token_ids)
+        logits, iters, scores, states = model(token_ids)
 
         loss_dict = criterion(
             logits=logits,
             targets=labels,
             checker_scores=scores,
+            intermediate_states=states,
             iterations_used=iters,
             max_iterations=k,
         )
@@ -145,6 +147,7 @@ def train_rsra_epoch(
         total_loss += loss.item()
         total_bce += loss_dict["bce_loss"].item()
         total_chk += loss_dict["checker_loss"].item()
+        total_target += loss_dict["avg_checker_target"].item()
         total_iters += iters
         n += 1
 
@@ -152,6 +155,7 @@ def train_rsra_epoch(
         "loss": total_loss / n,
         "bce": total_bce / n,
         "checker": total_chk / n,
+        "avg_checker_target": total_target / n,
         "avg_iters": total_iters / n,
     }
 
@@ -205,7 +209,7 @@ def evaluate_rsra(
         token_ids = token_ids.to(device)
         labels = labels.to(device)
 
-        logits, iters, _ = model(token_ids)
+        logits, iters, _, _ = model(token_ids)
         preds = (logits > 0.5).float()
         correct += (preds == labels).sum().item()
         total += labels.size(0)
@@ -314,7 +318,19 @@ def run_task_benchmark(
     small_opt = torch.optim.AdamW(small_base.parameters(), lr=config.lr, weight_decay=config.weight_decay)
     large_opt = torch.optim.AdamW(large_base.parameters(), lr=config.lr, weight_decay=config.weight_decay)
 
-    criterion = JointLossClassification(gamma=0.5, lambda_flops=0.01)
+    criterion = JointLossClassification(
+        gamma=1.0,
+        lambda_flops=0.01,
+        convergence_temp=0.1,
+    )
+
+    # Tau curriculum: start easy, get stricter
+    tau_scheduler = TauScheduler(
+        tau_start=0.3,
+        tau_end=0.8,
+        warmup_epochs=3,
+        ramp_epochs=max(1, config.epochs - 5),
+    )
 
     train_loader = DataLoader(
         train_ds, batch_size=config.batch_size, shuffle=True,
@@ -327,6 +343,10 @@ def run_task_benchmark(
 
     for epoch in range(config.epochs):
         t0 = time.time()
+
+        # Apply tau curriculum
+        tau = tau_scheduler.get_tau(epoch)
+        rsra.rsra_block.config.tau = tau
 
         rsra_metrics = train_rsra_epoch(
             rsra, train_loader, rsra_opt, criterion, device,

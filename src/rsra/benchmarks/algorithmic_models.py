@@ -56,8 +56,8 @@ class RSRAForAlgorithmic(nn.Module):
 
     Returns (forward)
     ------------------
-    tuple[torch.Tensor, int, list[torch.Tensor]]
-        ``(logits, iterations_used, checker_scores)``
+    tuple[torch.Tensor, int, list[torch.Tensor], list[torch.Tensor]]
+        ``(logits, iterations_used, checker_scores, intermediate_states)``
     """
 
     def __init__(
@@ -83,7 +83,7 @@ class RSRAForAlgorithmic(nn.Module):
             nn.Sigmoid(),
         )
 
-    def forward(self, token_ids: torch.Tensor) -> tuple[torch.Tensor, int, list[torch.Tensor]]:
+    def forward(self, token_ids: torch.Tensor) -> tuple[torch.Tensor, int, list[torch.Tensor], list[torch.Tensor]]:
         """Forward pass: classify algorithmic task instance.
 
         Parameters
@@ -93,10 +93,11 @@ class RSRAForAlgorithmic(nn.Module):
 
         Returns
         -------
-        tuple[torch.Tensor, int, list[torch.Tensor]]
+        tuple[torch.Tensor, int, list[torch.Tensor], list[torch.Tensor]]
             - Probability of shape ``(batch, 1)``
             - Number of RSRA iterations used
             - List of checker scores at each iteration
+            - List of intermediate states at each iteration
         """
         B, S = token_ids.shape
         positions = torch.arange(S, device=token_ids.device).unsqueeze(0).expand(B, -1)
@@ -111,6 +112,7 @@ class RSRAForAlgorithmic(nn.Module):
         h = rsra_out.output_state
         iters = rsra_out.iterations_used
         scores = rsra_out.checker_scores
+        states = rsra_out.intermediate_states
 
         # Query-token pooling: extract the last non-pad token (the QUERY token)
         # which has attended to all input context through self-attention
@@ -121,7 +123,7 @@ class RSRAForAlgorithmic(nn.Module):
         pooled = torch.gather(h, dim=1, index=gather_idx).squeeze(1)  # (B, D)
 
         logits = self.classifier(pooled)
-        return logits, iters, scores
+        return logits, iters, scores, states
 
 
 # ======================================================================

@@ -100,6 +100,10 @@ class RSRABlockOutput:
     checker_scores : list[torch.Tensor]
         Checker scores at each iteration.  Each entry has shape
         ``(batch, seq_len, 1)``.
+    intermediate_states : list[torch.Tensor]
+        Generated states at each iteration ``h_tilde_k``.  Used by
+        the loss function to compute convergence-based checker
+        targets ``exp(-||h_k - h_{k-1}|| / temp)``.
     iterations_used : int
         Number of generate-check-refine cycles executed.
     accepted : bool
@@ -109,6 +113,9 @@ class RSRABlockOutput:
 
     output_state: torch.Tensor
     checker_scores: list[torch.Tensor] = field(
+        default_factory=list
+    )
+    intermediate_states: list[torch.Tensor] = field(
         default_factory=list
     )
     iterations_used: int = 0
@@ -198,6 +205,7 @@ class RSRABlock(nn.Module):
         terminates early when the checker passes.
         """
         scores: list[torch.Tensor] = []
+        states: list[torch.Tensor] = []
         accepted = False
         iters = 0
         best_state: torch.Tensor | None = None
@@ -210,6 +218,7 @@ class RSRABlock(nn.Module):
             # 2. Check
             v = self.checker(h_tilde)
             scores.append(v)
+            states.append(h_tilde)
             iters = k + 1
 
             # 3. Compute acceptance score (active positions only)
@@ -241,6 +250,7 @@ class RSRABlock(nn.Module):
         return RSRABlockOutput(
             output_state=output,
             checker_scores=scores,
+            intermediate_states=states,
             iterations_used=iters,
             accepted=accepted,
         )

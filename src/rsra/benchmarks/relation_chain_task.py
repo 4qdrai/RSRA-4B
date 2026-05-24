@@ -264,8 +264,20 @@ class RSRAForTRLC(nn.Module):
             nn.Sigmoid(),
         )
 
-    def forward(self, token_ids: torch.Tensor) -> tuple[torch.Tensor, int, list[torch.Tensor]]:
-        """Forward pass: classify transitive query."""
+    def forward(self, token_ids: torch.Tensor) -> tuple[torch.Tensor, int, list[torch.Tensor], list[torch.Tensor]]:
+        """Forward pass: classify transitive query.
+
+        Returns
+        -------
+        logits : torch.Tensor
+            Predictions ``(batch, 1)`` in ``[0, 1]``.
+        iters : int
+            Number of refinement iterations used.
+        scores : list[torch.Tensor]
+            Checker scores at each iteration.
+        states : list[torch.Tensor]
+            Intermediate states at each iteration (for checker training).
+        """
         B, S = token_ids.shape
         positions = torch.arange(S, device=token_ids.device).unsqueeze(0).expand(B, -1)
 
@@ -279,6 +291,7 @@ class RSRAForTRLC(nn.Module):
         h = rsra_out.output_state
         iters = rsra_out.iterations_used
         scores = rsra_out.checker_scores
+        states = rsra_out.intermediate_states
 
         # Query-token pooling: extract the last non-pad token (the '?' token)
         # which has attended to all rules through self-attention
@@ -290,4 +303,4 @@ class RSRAForTRLC(nn.Module):
         pooled = torch.gather(h, dim=1, index=gather_idx).squeeze(1)  # (B, D)
 
         logits = self.classifier(pooled)
-        return logits, iters, scores
+        return logits, iters, scores, states

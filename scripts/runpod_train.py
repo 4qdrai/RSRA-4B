@@ -48,7 +48,7 @@ from rsra.benchmarks.baseline_transformer import (
     BaselineTransformer,
 )
 from rsra.core.rsra_block import RSRABlock, RSRABlockConfig
-from rsra.core.joint_loss_classification import JointLossClassification
+from rsra.core.joint_loss_classification import JointLossClassification, TauScheduler
 
 
 # ======================================================================
@@ -139,8 +139,12 @@ def train_one_epoch_variable_iters(
     sum_flops = 0.0
 
     criterion = JointLossClassification(
-        gamma=0.5,
+        gamma=1.0,
         lambda_flops=0.01,
+        convergence_temp=0.1,
+        w_convergence=0.5,
+        w_consistency=0.3,
+        w_correctness=0.2,
     )
 
     for token_ids, labels, _ in loader:
@@ -153,13 +157,14 @@ def train_one_epoch_variable_iters(
             k = random.randint(config.min_train_iters, config.max_train_iters)
             model.rsra_block.config.max_iterations = k
 
-        logits, iters, scores = model(token_ids)
+        logits, iters, scores, states = model(token_ids)
 
-        # Joint loss: BCE + checker supervision + FLOPs penalty
+        # Joint loss: BCE + multi-signal checker supervision + FLOPs penalty
         loss_dict = criterion(
             logits=logits,
             targets=labels,
             checker_scores=scores,
+            intermediate_states=states,
             iterations_used=iters,
             max_iterations=model.rsra_block.config.max_iterations,
         )
@@ -334,6 +339,17 @@ def run_h100_benchmark(config: H100Config | None = None) -> dict:
     base_opt = torch.optim.AdamW(baseline.parameters(), lr=config.lr, weight_decay=config.weight_decay)
     rsra_opt = torch.optim.AdamW(rsra.parameters(), lr=config.lr, weight_decay=config.weight_decay)
 
+    # --- Tau Curriculum Scheduler ---
+    # Start with low tau (easy acceptance) and ramp up to strict acceptance
+    total_epochs = sum(p["epochs"] for p in config.curriculum_phases)
+    tau_scheduler = TauScheduler(
+        tau_start=0.3,
+        tau_end=0.8,
+        warmup_epochs=5,
+        ramp_epochs=max(1, total_epochs - 10),
+    )
+    print(f"  Tau schedule: {tau_scheduler}", flush=True)
+
     # --- Curriculum Training ---
     print("\n[2/5] Curriculum Training...", flush=True)
 
@@ -386,6 +402,10 @@ def run_h100_benchmark(config: H100Config | None = None) -> dict:
                 pg["lr"] = lr
             for pg in rsra_opt.param_groups:
                 pg["lr"] = lr
+
+            # Adjust tau (checker acceptance threshold) via curriculum
+            tau = tau_scheduler.get_tau(global_epoch)
+            rsra.rsra_block.config.tau = tau
 
             # Train baseline
             t0 = time.time()
