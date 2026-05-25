@@ -175,6 +175,7 @@ class RSRABlock(nn.Module):
         h: torch.Tensor,
         context: torch.Tensor | None = None,
         key_padding_mask: torch.Tensor | None = None,
+        attn_mask: torch.Tensor | None = None,
     ) -> RSRABlockOutput:
         """Execute the recursive generate-check-refine loop with
         token-level adaptive halting.
@@ -195,6 +196,8 @@ class RSRABlock(nn.Module):
             ``(batch, seq_len, context_dim)``.
         key_padding_mask : torch.Tensor | None, optional
             Padding mask for self-attention ``(batch, seq_len)`` as ``bool``.
+        attn_mask : torch.Tensor | None, optional
+            Causal attention mask ``(seq_len, seq_len)`` or ``(batch * num_heads, seq_len, seq_len)``.
 
         Returns
         -------
@@ -233,7 +236,11 @@ class RSRABlock(nn.Module):
         for k in range(self.config.max_iterations):
             # 1. Generate -- ALL tokens participate so that done tokens
             #    still provide self-attention context to active ones.
-            h_tilde = self.generator(h, context, key_padding_mask=key_padding_mask)
+            h_tilde = self.generator(
+                h, context,
+                key_padding_mask=key_padding_mask,
+                attn_mask=attn_mask
+            )
 
             # 2. Check
             v = self.checker(h_tilde)

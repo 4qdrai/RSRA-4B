@@ -1,0 +1,115 @@
+{
+  "params": {
+    "hierarchy": 20461,
+    "flat": 6098,
+    "baseline": 16305
+  },
+  "training_log": {
+    "hierarchy": [
+      {
+        "loss": 0.7005584927705618,
+        "avg_iters": 1.0,
+        "tier_operative_pct": 100.0,
+        "tier_tactical_pct": 0.0,
+        "tier_strategic_pct": 0.0,
+        "tier_fallback_pct": 0.0
+      },
+      {
+        "loss": 0.6967110908948458,
+        "avg_iters": 1.0,
+        "tier_operative_pct": 100.0,
+        "tier_tactical_pct": 0.0,
+        "tier_strategic_pct": 0.0,
+        "tier_fallback_pct": 0.0
+      }
+    ],
+    "flat": [
+      {
+        "loss": 0.7870856248415433,
+        "avg_iters": 4.3076923076923075
+      },
+      {
+        "loss": 0.7834742023394659,
+        "avg_iters": 6.230769230769231
+      }
+    ],
+    "baseline": [
+      {
+        "loss": 0.6997039593183078
+      },
+      {
+        "loss": 0.6974957860433139
+      }
+    ]
+  },
+  "chain_length_results": {
+    "chain_2": {
+      "hierarchy": {
+        "accuracy": 0.5,
+        "avg_iters": 1.0,
+        "tier_operative_pct": 100.0,
+        "tier_tactical_pct": 0.0,
+        "tier_strategic_pct": 0.0,
+        "tier_fallback_pct": 0.0
+      },
+      "flat": {
+        "accuracy": 0.5,
+        "avg_iters": 1.0
+      },
+      "baseline": {
+        "accuracy": 0.5
+      }
+    },
+    "chain_3": {
+      "hierarchy": {
+        "accuracy": 0.5,
+        "avg_iters": 1.0,
+        "tier_operative_pct": 100.0,
+        "tier_tactical_pct": 0.0,
+        "tier_strategic_pct": 0.0,
+        "tier_fallback_pct": 0.0
+      },
+      "flat": {
+        "accuracy": 0.5,
+        "avg_iters": 1.0
+      },
+      "baseline": {
+        "accuracy": 0.5
+      }
+    },
+    "chain_4": {
+      "hierarchy": {
+        "accuracy": 0.5,
+        "avg_iters": 1.0,
+        "tier_operative_pct": 100.0,
+        "tier_tactical_pct": 0.0,
+        "tier_strategic_pct": 0.0,
+        "tier_fallback_pct": 0.0
+      },
+      "flat": {
+        "accuracy": 0.5,
+        "avg_iters": 1.0
+      },
+      "baseline": {
+        "accuracy": 0.5
+      }
+    },
+    "chain_5": {
+      "hierarchy": {
+        "accuracy": 0.5,
+        "avg_iters": 1.0,
+        "tier_operative_pct": 100.0,
+        "tier_tactical_pct": 0.0,
+        "tier_strategic_pct": 0.0,
+        "tier_fallback_pct": 0.0
+      },
+      "flat": {
+        "accuracy": 0.5,
+        "avg_iters": 1.0
+      },
+      "baseline": {
+        "accuracy": 0.5
+      }
+    }
+  }
+}
