@@ -245,7 +245,7 @@ def evaluate(
         labels = labels.to(device)
 
         if is_rsra:
-            logits, iters, _ = model(token_ids)
+            logits, iters, _, _ = model(token_ids)
             total_iters += iters
         else:
             logits = model(token_ids)

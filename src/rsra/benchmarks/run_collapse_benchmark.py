@@ -122,7 +122,7 @@ def train_one_epoch(
         optimizer.zero_grad()
 
         if is_rsra:
-            preds, _, scores = model(tokens)
+            preds, _, scores, _ = model(tokens)
             classification_loss = criterion(preds, labels)
             
             # Stack checker scores to shape (B, K, S, 1) and expand target label
@@ -173,7 +173,7 @@ def evaluate_model(
         labels = labels.to(device)
 
         if is_rsra:
-            preds, iters, _ = model(tokens)
+            preds, iters, _, _ = model(tokens)
             total_iters += iters * tokens.size(0)
         else:
             preds = model(tokens)

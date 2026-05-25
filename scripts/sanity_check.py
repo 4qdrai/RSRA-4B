@@ -103,11 +103,12 @@ def run_sanity_check() -> bool:
         n = 0
 
         for token_ids, labels, _ in loader:
-            logits, iters, scores = model(token_ids)
+            logits, iters, scores, states = model(token_ids)
             loss_dict = criterion(
                 logits=logits,
                 targets=labels,
                 checker_scores=scores,
+                intermediate_states=states,
                 iterations_used=iters,
                 max_iterations=block_cfg.max_iterations,
             )
@@ -149,7 +150,7 @@ def run_sanity_check() -> bool:
 
     with torch.no_grad():
         for token_ids, labels, _ in loader:
-            logits, iters, scores = model(token_ids)
+            logits, iters, scores, states = model(token_ids)
             preds = (logits > 0.5).float()
             correct = (preds == labels).float().squeeze(-1)  # (B,)
 
@@ -212,11 +213,12 @@ def run_sanity_check() -> bool:
     model.train()
     optimizer.zero_grad()
     token_ids, labels, _ = next(iter(loader))
-    logits, iters, scores = model(token_ids)
+    logits, iters, scores, states = model(token_ids)
     loss_dict = criterion(
         logits=logits,
         targets=labels,
         checker_scores=scores,
+        intermediate_states=states,
         iterations_used=iters,
         max_iterations=5,
     )
@@ -244,7 +246,7 @@ def run_sanity_check() -> bool:
     nan_found = False
     with torch.no_grad():
         for token_ids, labels, _ in loader:
-            logits, _, scores = model(token_ids)
+            logits, _, scores, states = model(token_ids)
             if torch.isnan(logits).any() or torch.isinf(logits).any():
                 nan_found = True
                 break
