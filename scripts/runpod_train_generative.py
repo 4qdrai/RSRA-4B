@@ -376,6 +376,7 @@ def run_generative_benchmark():
     parser.add_argument("--d_ff", type=int, default=512, help="Feedforward dimension size")
     parser.add_argument("--lr", type=float, default=5e-4, help="Learning rate")
     parser.add_argument("--batch_size", type=int, default=256, help="Batch size")
+    parser.add_argument("--baseline_n_layers", type=int, default=1, help="Number of layers in the Baseline Transformer")
     args = parser.parse_args()
 
     config = GenerativeH100Config()
@@ -384,6 +385,7 @@ def run_generative_benchmark():
     config.d_ff = args.d_ff
     config.lr = args.lr
     config.batch_size = args.batch_size
+    config.baseline_n_layers = args.baseline_n_layers
     
     epochs_mult = args.epochs_multiplier
     data_mult = args.data_multiplier
