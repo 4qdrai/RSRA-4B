@@ -407,13 +407,13 @@ def run_generative_benchmark():
         # Progressive curriculum scaled by epochs_multiplier!
         # Allows easy scaling for larger models (which need more epochs to converge).
         phase1_epochs = int(10 * epochs_mult)
-        phase2_epochs = int(30 * epochs_mult)
-        phase3_epochs = int(80 * epochs_mult)
+        phase2_epochs = int(22.5 * epochs_mult)  # Reduced by 25% (30 -> 22.5)
+        phase3_epochs = int(40 * epochs_mult)    # Reduced by 50% (80 -> 40)
         data_mult = 5.0
     else:
         phase1_epochs = int(8 * epochs_mult)
-        phase2_epochs = int(8 * epochs_mult)
-        phase3_epochs = int(8 * epochs_mult)
+        phase2_epochs = int(6 * epochs_mult)     # Reduced by 25% (8 -> 6)
+        phase3_epochs = int(4 * epochs_mult)     # Reduced by 50% (8 -> 4)
         
     config.curriculum_phases = [
         {"epochs": phase1_epochs, "n_range": (2, 3), "n_train": int(15000 * data_mult), "n_distractors": 0},
