@@ -226,3 +226,144 @@ class GenerativeTRLCDataset(Dataset):
             torch.tensor(labels, dtype=torch.long),
             instance.chain_length
         )
+
+
+class ComplexGenerativeTRLCDataset(Dataset):
+    """Dataset of highly-branched Generative TRLC logic path instances with cyclic loops."""
+
+    def __init__(
+        self,
+        size: int,
+        n_range: tuple[int, int] = (2, 5),
+        max_vars: int = 100,
+        branching_factor: int = 2,
+        decoy_depth: int = 2,
+        num_cycles: int = 2,
+        max_seq_len: int = 256,
+        seed: int = 42,
+        tokenizer: Optional[GenerativeTRLCTokenizer] = None,
+    ) -> None:
+        super().__init__()
+        self.size = size
+        self.n_range = n_range
+        self.max_vars = max_vars
+        self.branching_factor = branching_factor
+        self.decoy_depth = decoy_depth
+        self.num_cycles = num_cycles
+        self.max_seq_len = max_seq_len
+
+        if tokenizer is None:
+            self.tokenizer = GenerativeTRLCTokenizer(max_vars=max_vars)
+        else:
+            self.tokenizer = tokenizer
+
+        self.rng = random.Random(seed)
+        self.instances: list[GenerativeTRLCInstance] = []
+
+        for _ in range(size):
+            chain_len = self.rng.randint(n_range[0], n_range[1])
+            self.instances.append(self._generate_instance(chain_len))
+
+    def _generate_instance(self, n: int) -> GenerativeTRLCInstance:
+        """Generate a single highly-branched logic chain instance with loops."""
+        # 1. Generate Core Truth Path
+        path = []
+        while len(path) < n + 1:
+            v = self.rng.randint(0, self.max_vars - 1)
+            if v not in path:
+                path.append(v)
+
+        start_var = path[0]
+        end_var = path[-1]
+
+        rules = []
+        # Add core rules
+        for i in range(n):
+            rules.append((path[i], path[i+1]))
+
+        used_vars = set(path)
+
+        def get_fresh_var() -> int:
+            attempts = 0
+            while attempts < 1000:
+                attempts += 1
+                v = self.rng.randint(0, self.max_vars - 1)
+                if v not in used_vars:
+                    used_vars.add(v)
+                    return v
+            return self.rng.randint(0, self.max_vars - 1)
+
+        # 2. Add Deep Decoy Trees from each core node (except the final target)
+        for core_node in path[:-1]:
+            nodes_to_expand = [core_node]
+            for depth in range(self.decoy_depth):
+                next_level = []
+                for parent in nodes_to_expand:
+                    for _ in range(self.branching_factor - 1):
+                        child = get_fresh_var()
+                        rules.append((parent, child))
+                        next_level.append(child)
+                nodes_to_expand = next_level
+
+        # 3. Add Complex Cycles (Loops of length 3+) hooked to core nodes
+        for _ in range(self.num_cycles):
+            cycle_len = self.rng.randint(3, 5)
+            cycle_nodes = []
+            for _ in range(cycle_len):
+                cycle_nodes.append(get_fresh_var())
+
+            # Link the cycle nodes
+            for i in range(cycle_len):
+                u = cycle_nodes[i]
+                v = cycle_nodes[(i + 1) % cycle_len]
+                rules.append((u, v))
+
+            # Hook the cycle up to one of the core nodes (except the target)
+            hook_source = self.rng.choice(path[:-1])
+            rules.append((hook_source, cycle_nodes[0]))
+
+        # 4. Shuffle rules to force dynamic routing
+        self.rng.shuffle(rules)
+
+        return GenerativeTRLCInstance(
+            rules=rules,
+            start_var=start_var,
+            end_var=end_var,
+            path=path,
+            chain_length=n,
+        )
+
+    def __len__(self) -> int:
+        return self.size
+
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor, int]:
+        instance = self.instances[idx]
+        
+        # Input part: Rules + Query
+        input_ids = self.tokenizer.encode_input(instance.rules, instance.start_var)
+        
+        # Target part: Path elements following start_var (e.g. path[1:])
+        target_ids = self.tokenizer.encode_target(instance.path[1:])
+        
+        # Combine
+        combined_ids = input_ids + target_ids
+        
+        # Create standard causal labels: mask the input tokens (set to -100)
+        # and keep the target tokens for loss computation
+        labels = [-100] * len(input_ids) + target_ids
+        
+        # Pad or truncate
+        if len(combined_ids) > self.max_seq_len:
+            combined_ids = combined_ids[:self.max_seq_len]
+            labels = labels[:self.max_seq_len]
+        else:
+            padding_len = self.max_seq_len - len(combined_ids)
+            combined_ids += [self.tokenizer.pad_id] * padding_len
+            labels += [-100] * padding_len
+            
+        return (
+            torch.tensor(combined_ids, dtype=torch.long),
+            torch.tensor(labels, dtype=torch.long),
+            instance.chain_length
+        )
+

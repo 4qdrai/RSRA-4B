@@ -82,6 +82,7 @@ class RSRABlockConfig:
     constraint: ConstraintMode = ConstraintMode.BANACH
     contraction_factor: float = 0.5
     context_dim: int | None = None
+    min_iterations: int = 1
 
 
 # ======================================================================
@@ -263,10 +264,10 @@ class RSRABlock(nn.Module):
             done_mask = done_mask | newly_done
 
             # 4. Early exit at inference time when all active tokens are done.
-            # We enforce a minimum of 2 iterations (3 thinking steps) to prevent
+            # We enforce a minimum iteration threshold (e.g. 3 thinking steps) to prevent
             # premature exit before reasoning has physically propagated through the loops.
             fraction_done = done_mask.float().mean().item()
-            if fraction_done >= 1.0 and not self.training and k >= 2:
+            if fraction_done >= 1.0 and not self.training and k >= (self.config.min_iterations - 1):
                 break
 
             # 5. Refine: only update NOT-done tokens.  Frozen tokens

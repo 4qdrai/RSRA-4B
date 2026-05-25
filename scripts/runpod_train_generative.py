@@ -32,6 +32,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from rsra.benchmarks.generative_chain_task import (
     GenerativeTRLCDataset,
+    ComplexGenerativeTRLCDataset,
     GenerativeTRLCTokenizer,
     PATH_TOKEN,
 )
@@ -377,6 +378,13 @@ def run_generative_benchmark():
     parser.add_argument("--lr", type=float, default=5e-4, help="Learning rate")
     parser.add_argument("--batch_size", type=int, default=256, help="Batch size")
     parser.add_argument("--baseline_n_layers", type=int, default=1, help="Number of layers in the Baseline Transformer")
+    
+    # Complex task arguments
+    parser.add_argument("--task_type", type=str, default="standard", choices=["standard", "complex"], help="Task type to train on")
+    parser.add_argument("--branching_factor", type=int, default=2, help="Branching factor for complex task decoy trees")
+    parser.add_argument("--decoy_depth", type=int, default=2, help="Decoy tree depth for complex task decoy trees")
+    parser.add_argument("--num_cycles", type=int, default=2, help="Number of loop cycles for complex task cyclic traps")
+    
     args = parser.parse_args()
 
     config = GenerativeH100Config()
@@ -386,6 +394,10 @@ def run_generative_benchmark():
     config.lr = args.lr
     config.batch_size = args.batch_size
     config.baseline_n_layers = args.baseline_n_layers
+    
+    if args.task_type == "complex":
+        config.max_seq_len = 256  # Scale context to fit branching logic rules
+        config.max_vars = 60      # Expand variable pool to prevent collisions
     
     epochs_mult = args.epochs_multiplier
     data_mult = args.data_multiplier
@@ -436,6 +448,7 @@ def run_generative_benchmark():
         d_ff=config.d_ff,
         tau=config.rsra_tau,
         max_iterations=config.rsra_train_max_iters,
+        min_iterations=3,  # prevent premature halting on step 1
     )
     rsra_block = RSRABlock(block_cfg)
     rsra = GenerativeRSRA(
@@ -479,25 +492,50 @@ def run_generative_benchmark():
         print(f"    Distractors Count:  {phase['n_distractors']}")
         
         # Load Dataset
-        train_ds = GenerativeTRLCDataset(
-            size=phase["n_train"],
-            n_range=phase["n_range"],
-            max_vars=config.max_vars,
-            n_distractors=phase["n_distractors"],
-            max_seq_len=config.max_seq_len,
-            seed=config.seed + phase_idx,
-            tokenizer=tokenizer,
-        )
-        # Validation Dataset
-        val_ds = GenerativeTRLCDataset(
-            size=1000,
-            n_range=phase["n_range"],
-            max_vars=config.max_vars,
-            n_distractors=phase["n_distractors"],
-            max_seq_len=config.max_seq_len,
-            seed=config.seed + 100 + phase_idx,
-            tokenizer=tokenizer,
-        )
+        if args.task_type == "complex":
+            train_ds = ComplexGenerativeTRLCDataset(
+                size=phase["n_train"],
+                n_range=phase["n_range"],
+                max_vars=config.max_vars,
+                branching_factor=args.branching_factor,
+                decoy_depth=args.decoy_depth,
+                num_cycles=args.num_cycles,
+                max_seq_len=config.max_seq_len,
+                seed=config.seed + phase_idx,
+                tokenizer=tokenizer,
+            )
+            # Validation Dataset
+            val_ds = ComplexGenerativeTRLCDataset(
+                size=1000,
+                n_range=phase["n_range"],
+                max_vars=config.max_vars,
+                branching_factor=args.branching_factor,
+                decoy_depth=args.decoy_depth,
+                num_cycles=args.num_cycles,
+                max_seq_len=config.max_seq_len,
+                seed=config.seed + 100 + phase_idx,
+                tokenizer=tokenizer,
+            )
+        else:
+            train_ds = GenerativeTRLCDataset(
+                size=phase["n_train"],
+                n_range=phase["n_range"],
+                max_vars=config.max_vars,
+                n_distractors=phase["n_distractors"],
+                max_seq_len=config.max_seq_len,
+                seed=config.seed + phase_idx,
+                tokenizer=tokenizer,
+            )
+            # Validation Dataset
+            val_ds = GenerativeTRLCDataset(
+                size=1000,
+                n_range=phase["n_range"],
+                max_vars=config.max_vars,
+                n_distractors=phase["n_distractors"],
+                max_seq_len=config.max_seq_len,
+                seed=config.seed + 100 + phase_idx,
+                tokenizer=tokenizer,
+            )
         
         train_loader = DataLoader(
             train_ds, batch_size=config.batch_size, shuffle=True, drop_last=True
@@ -533,15 +571,28 @@ def run_generative_benchmark():
             
             # --- 3. Periodic Evaluation ---
             # To preserve speed, we compute path-generation exact accuracy every epoch on a 256-subset
-            eval_subset_ds = GenerativeTRLCDataset(
-                size=256,
-                n_range=phase["n_range"],
-                max_vars=config.max_vars,
-                n_distractors=phase["n_distractors"],
-                max_seq_len=config.max_seq_len,
-                seed=config.seed + 500 + global_epoch,
-                tokenizer=tokenizer,
-            )
+            if args.task_type == "complex":
+                eval_subset_ds = ComplexGenerativeTRLCDataset(
+                    size=256,
+                    n_range=phase["n_range"],
+                    max_vars=config.max_vars,
+                    branching_factor=args.branching_factor,
+                    decoy_depth=args.decoy_depth,
+                    num_cycles=args.num_cycles,
+                    max_seq_len=config.max_seq_len,
+                    seed=config.seed + 500 + global_epoch,
+                    tokenizer=tokenizer,
+                )
+            else:
+                eval_subset_ds = GenerativeTRLCDataset(
+                    size=256,
+                    n_range=phase["n_range"],
+                    max_vars=config.max_vars,
+                    n_distractors=phase["n_distractors"],
+                    max_seq_len=config.max_seq_len,
+                    seed=config.seed + 500 + global_epoch,
+                    tokenizer=tokenizer,
+                )
             eval_loader = DataLoader(eval_subset_ds, batch_size=config.batch_size, shuffle=False)
             
             # Baseline accuracy
@@ -586,12 +637,21 @@ def run_generative_benchmark():
             
             global_epoch += 1
 
+        # Save curriculum phase checkpoints
+        torch.save(rsra.state_dict(), os.path.join(config.results_dir, f"rsra_phase_{phase_idx+1}.pt"))
+        torch.save(baseline.state_dict(), os.path.join(config.results_dir, f"baseline_phase_{phase_idx+1}.pt"))
+        print(f"Phase {phase_idx+1} checkpoints successfully saved!")
+
     # Save final logs
     with open(os.path.join(config.results_dir, "generative_results.json"), "w") as f:
         json.dump(history, f, indent=2)
         
+    # Save final model weights
+    torch.save(rsra.state_dict(), os.path.join(config.results_dir, "rsra_model.pt"))
+    torch.save(baseline.state_dict(), os.path.join(config.results_dir, "baseline_model.pt"))
+        
     print("\nPre-training Sweep Completed Successfully!")
-    print(f"Results dumped in {config.results_dir}")
+    print(f"Results and model weights (.pt checkpoints) dumped in {config.results_dir}")
 
 
 if __name__ == "__main__":
