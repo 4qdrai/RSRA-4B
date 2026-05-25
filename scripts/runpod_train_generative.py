@@ -390,11 +390,11 @@ def run_generative_benchmark():
     epochs_mult = args.epochs_multiplier
     data_mult = args.data_multiplier
     if args.large:
-        # Progressive curriculum: Shift epochs from easy phases to hard phases!
-        # Total epochs remains 120 (same compute budget), but distributed for maximum convergence.
-        phase1_epochs = 10
-        phase2_epochs = 30
-        phase3_epochs = 80
+        # Progressive curriculum scaled by epochs_multiplier!
+        # Allows easy scaling for larger models (which need more epochs to converge).
+        phase1_epochs = int(10 * epochs_mult)
+        phase2_epochs = int(30 * epochs_mult)
+        phase3_epochs = int(80 * epochs_mult)
         data_mult = 5.0
     else:
         phase1_epochs = int(8 * epochs_mult)
