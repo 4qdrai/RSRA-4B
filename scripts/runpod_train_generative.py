@@ -388,13 +388,21 @@ def run_generative_benchmark():
     epochs_mult = args.epochs_multiplier
     data_mult = args.data_multiplier
     if args.large:
-        epochs_mult = 5.0
+        # Progressive curriculum: Shift epochs from easy phases to hard phases!
+        # Total epochs remains 120 (same compute budget), but distributed for maximum convergence.
+        phase1_epochs = 10
+        phase2_epochs = 30
+        phase3_epochs = 80
         data_mult = 5.0
+    else:
+        phase1_epochs = int(8 * epochs_mult)
+        phase2_epochs = int(8 * epochs_mult)
+        phase3_epochs = int(8 * epochs_mult)
         
     config.curriculum_phases = [
-        {"epochs": int(8 * epochs_mult), "n_range": (2, 3), "n_train": int(15000 * data_mult), "n_distractors": 0},
-        {"epochs": int(8 * epochs_mult), "n_range": (2, 5), "n_train": int(18000 * data_mult), "n_distractors": 0},
-        {"epochs": int(8 * epochs_mult), "n_range": (2, 6), "n_train": int(20000 * data_mult), "n_distractors": 2},
+        {"epochs": phase1_epochs, "n_range": (2, 3), "n_train": int(15000 * data_mult), "n_distractors": 0},
+        {"epochs": phase2_epochs, "n_range": (2, 5), "n_train": int(18000 * data_mult), "n_distractors": 0},
+        {"epochs": phase3_epochs, "n_range": (2, 6), "n_train": int(20000 * data_mult), "n_distractors": 2},
     ]
     
     os.makedirs(config.results_dir, exist_ok=True)
