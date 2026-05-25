@@ -262,9 +262,11 @@ class RSRABlock(nn.Module):
 
             done_mask = done_mask | newly_done
 
-            # 4. Early exit at inference time when all active tokens are done
+            # 4. Early exit at inference time when all active tokens are done.
+            # We enforce a minimum of 2 iterations (3 thinking steps) to prevent
+            # premature exit before reasoning has physically propagated through the loops.
             fraction_done = done_mask.float().mean().item()
-            if fraction_done >= 1.0 and not self.training:
+            if fraction_done >= 1.0 and not self.training and k >= 2:
                 break
 
             # 5. Refine: only update NOT-done tokens.  Frozen tokens
