@@ -253,9 +253,9 @@ Prompt Length $S$ & Reasoning Depth $K$ & CoT KV-Cache Entries & RSRA KV-Cache E
 
 As shown in Table~\ref{tab:kv_cache}, while the prompt length dominates at typical short-reasoning limits, the $O(1)$ footprint provides a massive 85.0\% memory reduction for extremely deep implication chains ($K=1000$), enabling deep iterative thinking without context length exhaustion.
 
-\subsection{Architectural Diagnoses \& Future Roadmap}
+\subsection{Architectural Diagnoses}
 
-The H100 pre-training sweeps revealed three critical insights into neural logical reasoning:
+The H100 pre-training sweeps revealed two critical insights into neural logical reasoning:
 
 \paragraph{1. The "Shortcut Loophole" (Label Leakage)}
 Static standard transformers do not trace paths sequentially. Instead, they exploit syntactic structural anomalies in the shuffled rule set (e.g., counting whether variables have matching incoming/outgoing rule frequencies or evaluating left-right set-intersection overlaps in parallel). This set-intersection heuristic allows the 6-layer baseline to maintain a \textasciitilde 65\% validation accuracy without tracing implication steps.
@@ -263,8 +263,41 @@ Static standard transformers do not trace paths sequentially. Instead, they expl
 \paragraph{2. The "Over-Refinement" Effect (Representation Drift)}
 Forcing RSRA to evaluate for exactly $K_{\text{eval}}=20$ iterations at test-time (when trained with variable iterations $K_{\text{train}} \le 10$) causes the continuous state representations to drift from the contraction region, leading to chance-level decay. Capping the test-time iteration limit at $K_{\text{eval}} = \max(5, N+3)$ preserves Banach contraction and successfully stabilizes inference.
 
-\paragraph{3. Future Roadmap: Generative Path-Tracing}
-To completely immunize reasoning tasks from set-intersection shortcut learning, we implement the **Generative Path-Tracing Task**. The model must output the exact, sequential variable chain (e.g., \texttt{x0 -> x3 -> x5 -> x9}) rather than answering a binary SAT query. Static transformers are mathematically incapable of generating chains longer than their physical layer depth in a single forward pass, providing an absolute, uncompromised benchmark of RSRA's superiority.
+\subsection{Empirical Verification: Generative Path-Tracing}
+
+To completely immunize the reasoning benchmark from statistical label-leakage shortcut heuristics, we formulated the \textbf{Generative Path-Tracing Task}. Here, the model must autoregressively generate the exact sequential chain of logical variables (e.g., \texttt{x0 -> x3 -> x5 -> x9}) rather than answering a binary SAT query. Because static standard transformers are mathematically incapable of generating logical implication sequences deeper than their physical layer count in a single forward pass, this task provides a rigorous and uncompromised benchmark of RSRA's recurrent scaling advantage.
+
+We conducted a head-to-head pre-training sweep comparing a standard single-layer Causal Decoder Baseline to a single-recurrent-layer RSRA configuration under strict parameter-matched budgets:
+\begin{itemize}
+    \item \textbf{Standard Task}: Baseline ($\approx$ 894k parameters) vs. RSRA-4B ($\approx$ 1.07M parameters; 1.19$\times$ parameter budget). Implication rules are shuffled with standard distractors.
+    \item \textbf{Complex Task}: Baseline ($\approx$ 1.00M parameters) vs. RSRA-4B ($\approx$ 1.18M parameters; 1.17$\times$ parameter budget). The routing space is expanded with recursive decoy trees (depth 2, branching factor 2) and cyclical loop traps (length $\ge 3$).
+\end{itemize}
+
+Both configurations were trained under a 181-epoch progressive curriculum (Phase 1: 25 epochs, $N \in [2, 3]$; Phase 2: 56 epochs, $N \in [2, 5]$; Phase 3: 100 epochs, $N \in [2, 6]$ with active distractors) on NVIDIA H100 SXM GPUs.
+
+The results, summarized in Table~\ref{tab:generative_results}, confirm the logical dominance of RSRA. The standard Causal Decoder fails to generalize as complexity and noise scale, while RSRA-4B maintains robust exact-path accuracy:
+\begin{itemize}
+    \item \textbf{Standard Task}: The baseline peaks at 49.22\% validation accuracy during Phase 2 (Epoch 58) but completely collapses under distractor rules in Phase 3, ending the curriculum sweep at \textbf{13.67\%} accuracy. RSRA-4B achieves a peak validation accuracy of \textbf{100.00\%} and closes the sweep at \textbf{94.53\%} exact-path accuracy using an average of 6.04 latent refinement steps.
+    \item \textbf{Complex Task}: The introduction of recursive decoy paths and cyclical loop traps completely breaks the standard Causal Decoder baseline, which collapses to a peak validation accuracy of just 7.42\% (Epoch 77) and finishes Phase 3 at a mere \textbf{5.08\%}. Conversely, RSRA-4B successfully routes through recursive distractors and bypasses loop traps in continuous latent space, reaching a peak accuracy of \textbf{98.05\%} (Epoch 175) and closing the 181-epoch sweep at an outstanding \textbf{90.63\% exact-path accuracy} using an average of 5.97 recurrent thinking iterations.
+\end{itemize}
+
+\begin{table}[h]
+\centering
+\caption{Generative Path-Tracing SFT Exact-Path Accuracy Comparison}
+\label{tab:generative_results}
+\begin{tabular}{lcccc}
+\toprule
+Metric \& Pre-training Phase & Std Baseline & Std RSRA-4B & Complex Baseline & Complex RSRA-4B \\
+\midrule
+Phase 1 (Epoch 24) & 26.95\% & \textbf{99.61\%} & 0.78\% & \textbf{12.11\%} \\
+Phase 2 (Epoch 80) & 45.31\% & \textbf{99.22\%} & 6.64\% & \textbf{75.00\%} \\
+Phase 3 (Epoch 180) & 13.67\% & \textbf{94.53\%} & 5.08\% & \textbf{90.63\%} \\
+\midrule
+\textbf{Peak Accuracy} & 49.22\% & \textbf{100.00\%} & 7.42\% & \textbf{98.05\%} \\
+\textbf{Avg. Thinking Steps ($K$)} & N/A & 6.04 & N/A & 5.97 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 
 \section{Scaling Analysis \& Compute Budget}

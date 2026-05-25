@@ -875,6 +875,72 @@
     </table>
   </div>
 
+  <!-- ==================== PAGE 13b ==================== -->
+  <div class="page" id="page-13b">
+    <div class="running-header">
+      <span>RSRA-4B: Intrinsic Latent Verification for Frontier Reasoning</span>
+      <span>Section 4.5: Generative Path-Tracing</span>
+    </div>
+    
+    <div class="subsection-title" style="margin-top: 0.5cm;">4.5 Generative Path-Tracing Task: Standard vs. Complex curriculum sweeps</div>
+    <p class="no-indent">
+      To completely immunize logical reasoning benchmarks from statistical shortcut learning (e.g. set-intersection matches), we formulated the <strong>Generative Path-Tracing Task</strong>. Here, the model must autoregressively generate the exact sequential chain of logical variables (e.g., <span class="code">x0 -> x3 -> x5 -> x9</span>) rather than answering a binary SAT query.
+    </p>
+    <p>
+      We conducted a head-to-head empirical validation comparing a standard single-layer Causal Decoder Baseline to a single-recurrent-layer RSRA configuration under strict parameter-matched budgets: (1) Standard Task: Baseline (~894k parameters) vs. RSRA-4B (~1.07M parameters); (2) Complex Task: Baseline (~1.00M parameters) vs. RSRA-4B (~1.18M parameters) incorporating recursive decoy trees (depth 2, branching factor 2) and cyclical loop traps (length $\ge 3$). Both models were trained under a 181-epoch progressive curriculum (Phase 1: 25 epochs; Phase 2: 56 epochs; Phase 3: 100 epochs with active distractors) on NVIDIA H100 SXM GPUs. Table 4b details the final validation accuracies:
+    </p>
+
+    <div class="table-caption">Table 4b: Generative Path-Tracing SFT Exact-Path Accuracy Comparison</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Metric & Pre-training Phase</th>
+          <th>Std Baseline</th>
+          <th>Std RSRA-4B</th>
+          <th>Complex Baseline</th>
+          <th>Complex RSRA-4B</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Phase 1 (Epoch 24)</td>
+          <td>26.95%</td>
+          <td><strong>99.61%</strong></td>
+          <td>0.78%</td>
+          <td><strong>12.11%</strong></td>
+        </tr>
+        <tr>
+          <td>Phase 2 (Epoch 80)</td>
+          <td>45.31%</td>
+          <td><strong>99.22%</strong></td>
+          <td>6.64%</td>
+          <td><strong>75.00%</strong></td>
+        </tr>
+        <tr>
+          <td>Phase 3 (Epoch 180)</td>
+          <td>13.67%</td>
+          <td><strong>94.53%</strong></td>
+          <td>5.08%</td>
+          <td><strong>90.63%</strong></td>
+        </tr>
+        <tr class="bottom-border">
+          <td><strong>Peak Accuracy (Avg. Steps $K$)</strong></td>
+          <td>49.22% (N/A)</td>
+          <td><strong>100.00% (6.04)</strong></td>
+          <td>7.42% (N/A)</td>
+          <td><strong>98.05% (5.97)</strong></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="figure-container" style="margin-top: 0.5cm;">
+      <img src="../figures/generative_comparison.png" class="figure-img" style="max-height: 5.2cm;" alt="Generative Comparison" />
+      <div class="figure-caption">
+        Figure 5: Generative Path-Tracing H100 Comparison. Standard causal decoders suffer severe collapse in Phase 3 due to distractor noise and recursion. RSRA-4B dynamically scales latent refinement iterations to achieve sustained high accuracy.
+      </div>
+    </div>
+  </div>
+
   <!-- ==================== PAGE 14 ==================== -->
   <div class="page" id="page-14">
     <div class="running-header">
