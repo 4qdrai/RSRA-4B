@@ -17,14 +17,15 @@ from rsra.core.rsra_block import RSRABlock, RSRABlockConfig
 # Load training utilities
 from runpod_train import H100Config, evaluate
 
-def run_eval_fix():
+def run_eval_fix(config: H100Config | None = None):
+    if config is None:
+        config = H100Config()
     print("=" * 72)
-    print("  RUNNING RSRA-4B POST-TRAINING ANALYSIS & H100 CORRECTION SCRIPT")
+    print(f"  RUNNING RSRA-4B POST-TRAINING ANALYSIS & H100 CORRECTION SCRIPT")
+    print(f"  Directory: {config.results_dir}")
     print("=" * 72)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
-
-    config = H100Config()
     tokenizer = TRLCTokenizer(max_vars=config.max_vars)
 
     # 1. Instantiate Models
@@ -50,7 +51,7 @@ def run_eval_fix():
     rsra = RSRAForTRLC(rsra_block, tokenizer.vocab_size, config.d_model, config.max_seq_len, tokenizer.pad_id).to(device)
 
     # 2. Load Checkpoints
-    checkpoint_path = "results/h100_benchmark/checkpoint_phase3.pt"
+    checkpoint_path = os.path.join(config.results_dir, "checkpoint_phase3.pt")
     if not os.path.exists(checkpoint_path):
         print(f"ERROR: Checkpoint not found at {checkpoint_path}")
         return
@@ -110,4 +111,22 @@ def run_eval_fix():
         print(f"  N={n} | Baseline Acc: {base_acc:6.1%} | RSRA-4B Acc: {rsra_acc:6.1%} (Iters: {avg_iters:.1f})")
 
 if __name__ == "__main__":
-    run_eval_fix()
+    # 1. Parameter-Matched Eval Sweep
+    config_4m = H100Config()
+    config_4m.d_model = 128
+    config_4m.n_heads = 4
+    config_4m.d_ff = 512
+    config_4m.baseline_n_layers = 1
+    config_4m.results_dir = "results/h100_benchmark/parameter_matched"
+    
+    run_eval_fix(config_4m)
+
+    # 2. Capacity-Matched Eval Sweep
+    config_30m = H100Config()
+    config_30m.d_model = 512
+    config_30m.n_heads = 8
+    config_30m.d_ff = 2048
+    config_30m.baseline_n_layers = 6
+    config_30m.results_dir = "results/h100_benchmark/capacity_matched"
+    
+    run_eval_fix(config_30m)
