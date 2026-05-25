@@ -384,6 +384,7 @@ def run_generative_benchmark():
     parser.add_argument("--branching_factor", type=int, default=2, help="Branching factor for complex task decoy trees")
     parser.add_argument("--decoy_depth", type=int, default=2, help="Decoy tree depth for complex task decoy trees")
     parser.add_argument("--num_cycles", type=int, default=2, help="Number of loop cycles for complex task cyclic traps")
+    parser.add_argument("--results_dir", type=str, default="results/generative_benchmark", help="Directory to save logs and checkpoints")
     
     args = parser.parse_args()
 
@@ -394,6 +395,7 @@ def run_generative_benchmark():
     config.lr = args.lr
     config.batch_size = args.batch_size
     config.baseline_n_layers = args.baseline_n_layers
+    config.results_dir = args.results_dir
     
     if args.task_type == "complex":
         config.max_seq_len = 256  # Scale context to fit branching logic rules
