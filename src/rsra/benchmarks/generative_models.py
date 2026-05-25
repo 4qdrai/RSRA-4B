@@ -86,7 +86,7 @@ class GenerativeBaselineTransformer(nn.Module):
 
         # Build causal mask (True = ignore in attention)
         causal_mask = torch.triu(
-            torch.full((S, S), float("-inf"), device=device), diagonal=1
+            torch.ones((S, S), dtype=torch.bool, device=device), diagonal=1
         )
         # Padding mask (True = ignore)
         pad_mask = (token_ids == self.config.pad_id)
@@ -178,9 +178,9 @@ class GenerativeRSRA(nn.Module):
         positions = torch.arange(S, device=device).unsqueeze(0).expand(B, -1)
         x = self.embedding(token_ids) + self.pos_embedding(positions)
 
-        # Causal attention mask
+        # Causal attention mask (True = ignore in attention)
         causal_mask = torch.triu(
-            torch.full((S, S), float("-inf"), device=device), diagonal=1
+            torch.ones((S, S), dtype=torch.bool, device=device), diagonal=1
         )
         pad_mask = (token_ids == self.pad_id)
 

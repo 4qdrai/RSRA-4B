@@ -366,7 +366,37 @@ def train_generative_epoch_baseline(
 # ======================================================================
 
 def run_generative_benchmark():
+    import argparse
+    parser = argparse.ArgumentParser(description="RSRA-4B Generative Training")
+    parser.add_argument("--large", action="store_true", help="Use 5x larger training data and epochs for high-capacity pre-training")
+    parser.add_argument("--epochs_multiplier", type=float, default=1.0, help="Multiply epochs by this factor")
+    parser.add_argument("--data_multiplier", type=float, default=1.0, help="Multiply training dataset sizes by this factor")
+    parser.add_argument("--d_model", type=int, default=128, help="Hidden dimension size")
+    parser.add_argument("--n_heads", type=int, default=4, help="Number of attention heads")
+    parser.add_argument("--d_ff", type=int, default=512, help="Feedforward dimension size")
+    parser.add_argument("--lr", type=float, default=5e-4, help="Learning rate")
+    parser.add_argument("--batch_size", type=int, default=256, help="Batch size")
+    args = parser.parse_args()
+
     config = GenerativeH100Config()
+    config.d_model = args.d_model
+    config.n_heads = args.n_heads
+    config.d_ff = args.d_ff
+    config.lr = args.lr
+    config.batch_size = args.batch_size
+    
+    epochs_mult = args.epochs_multiplier
+    data_mult = args.data_multiplier
+    if args.large:
+        epochs_mult = 5.0
+        data_mult = 5.0
+        
+    config.curriculum_phases = [
+        {"epochs": int(8 * epochs_mult), "n_range": (2, 3), "n_train": int(15000 * data_mult), "n_distractors": 0},
+        {"epochs": int(8 * epochs_mult), "n_range": (2, 5), "n_train": int(18000 * data_mult), "n_distractors": 0},
+        {"epochs": int(8 * epochs_mult), "n_range": (2, 6), "n_train": int(20000 * data_mult), "n_distractors": 2},
+    ]
+    
     os.makedirs(config.results_dir, exist_ok=True)
     
     print("=" * 72)
