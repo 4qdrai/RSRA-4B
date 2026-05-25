@@ -27,9 +27,9 @@ Thumbs.db
 # Figures are tracked (publication artifacts)
 # figures/  ← intentionally NOT ignored
 
-# PyTorch checkpoints
-*.pt
-*.pth
+# PyTorch checkpoints (commented out to allow H100 pushes)
+# *.pt
+# *.pth
 
 # Test cache
 .pytest_cache/
