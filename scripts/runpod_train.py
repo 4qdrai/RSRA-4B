@@ -355,6 +355,8 @@ def run_h100_benchmark(config: H100Config | None = None) -> dict:
 
     training_log = {"baseline": [], "rsra": []}
     total_epochs_done = 0
+    epoch_times = []
+    total_epochs = sum(phase["epochs"] for phase in config.curriculum_phases)
 
     for phase_idx, phase in enumerate(config.curriculum_phases):
         phase_epochs = phase["epochs"]
@@ -394,6 +396,7 @@ def run_h100_benchmark(config: H100Config | None = None) -> dict:
         total_phase_epochs = sum(p["epochs"] for p in config.curriculum_phases)
 
         for epoch in range(phase_epochs):
+            epoch_start = time.time()
             global_epoch = total_epochs_done + epoch
 
             # Adjust learning rate
@@ -421,6 +424,24 @@ def run_h100_benchmark(config: H100Config | None = None) -> dict:
             _, base_val_acc, _ = evaluate(baseline, val_loader, device, is_rsra=False)
             _, rsra_val_acc, rsra_val_iters = evaluate(rsra, val_loader, device, is_rsra=True)
 
+            epoch_duration = time.time() - epoch_start
+            epoch_times.append(epoch_duration)
+
+            # Calculate estimated remaining time
+            avg_epoch_time = sum(epoch_times) / len(epoch_times)
+            epochs_remaining = total_epochs - global_epoch - 1
+            est_remaining_seconds = avg_epoch_time * epochs_remaining
+
+            if epochs_remaining == 0:
+                time_str = "Final epoch complete"
+            else:
+                hours, rem = divmod(int(est_remaining_seconds), 3600)
+                minutes, seconds = divmod(rem, 60)
+                if hours > 0:
+                    time_str = f"Est. Remaining: {hours}h {minutes}m {seconds}s"
+                else:
+                    time_str = f"Est. Remaining: {minutes}m {seconds}s"
+
             training_log["baseline"].append({
                 "epoch": global_epoch, "phase": phase_idx + 1,
                 "loss": base_loss, "val_acc": base_val_acc, "time": base_train_time,
@@ -440,7 +461,8 @@ def run_h100_benchmark(config: H100Config | None = None) -> dict:
                     f"Base: loss={base_loss:.4f} acc={base_val_acc:.1%} ({base_train_time:.1f}s) | "
                     f"RSRA: loss={rsra_loss:.4f} acc={rsra_val_acc:.1%} iters={rsra_iters:.1f} ({rsra_train_time:.1f}s) | "
                     f"[bce={rsra_components['bce']:.4f} chk={rsra_components['checker']:.4f} flop={rsra_components['flops']:.3f}] | "
-                    f"lr={lr:.2e}",
+                    f"lr={lr:.2e} | "
+                    f"{time_str}",
                     flush=True
                 )
 
@@ -682,9 +704,12 @@ def push_results_to_github(config: H100Config) -> None:
         subprocess.run(["git", "config", "user.email", "runpod@rsra-4b.ai"], cwd=root, check=True)
         subprocess.run(["git", "config", "user.name", "RunPod H100 Benchmark"], cwd=root, check=True)
 
-        # Stage results (JSON + figures, skip large checkpoint .pt files)
-        subprocess.run(["git", "add", "results/h100_benchmark/benchmark_results.json"], cwd=root, check=True)
-        subprocess.run(["git", "add", "results/h100_benchmark/figures/"], cwd=root, check=True)
+        # Stage results dynamically based on config results path (ignores checkpoint files due to .gitignore)
+        results_json = os.path.join(config.results_dir, "benchmark_results.json")
+        figures_subdir = os.path.join(config.results_dir, "figures/")
+        
+        subprocess.run(["git", "add", results_json], cwd=root, check=True)
+        subprocess.run(["git", "add", figures_subdir], cwd=root, check=True)
 
         # Also stage updated figures in the main figures dir
         subprocess.run(["git", "add", "figures/"], cwd=root, check=False)
@@ -698,7 +723,8 @@ def push_results_to_github(config: H100Config) -> None:
         except Exception:
             pass
 
-        commit_msg = f"[RunPod] H100 benchmark results ({gpu_name})"
+        run_type = "Parameter-Matched (4M)" if config.d_model == 128 else "Capacity-Matched (30M/100M)"
+        commit_msg = f"[RunPod] H100 benchmark results - {run_type} ({gpu_name})"
         result = subprocess.run(
             ["git", "commit", "-m", commit_msg],
             cwd=root, capture_output=True, text=True,
@@ -734,7 +760,38 @@ def push_results_to_github(config: H100Config) -> None:
 # ======================================================================
 
 if __name__ == "__main__":
-    results = run_h100_benchmark()
+    print("=" * 72, flush=True)
+    print("  LAUNCHING SEQUENTIAL H100 SXM PRE-TRAINING RUNS (4M & 30M/100M)", flush=True)
+    print("=" * 72, flush=True)
 
-    # Auto-push results to GitHub
-    push_results_to_github(H100Config())
+    # 1. Parameter-Matched Test (4M vs 4M, 1 Layer)
+    print("\n" + "#" * 72, flush=True)
+    print("  RUN 1/2: PARAMETER-MATCHED SYSTEM (~4M Parameters)", flush=True)
+    print("#" * 72 + "\n", flush=True)
+    
+    config_4m = H100Config()
+    config_4m.d_model = 128
+    config_4m.n_heads = 4
+    config_4m.d_ff = 512
+    config_4m.baseline_n_layers = 1
+    config_4m.results_dir = "results/h100_benchmark/parameter_matched"
+    config_4m.figures_dir = "results/h100_benchmark/parameter_matched/figures"
+    
+    run_h100_benchmark(config_4m)
+    push_results_to_github(config_4m)
+
+    # 2. Capacity-Matched Test (30M RSRA vs 100M Baseline)
+    print("\n" + "#" * 72, flush=True)
+    print("  RUN 2/2: CAPACITY-MATCHED SYSTEM (~30M RSRA vs ~100M Baseline)", flush=True)
+    print("#" * 72 + "\n", flush=True)
+    
+    config_30m = H100Config()
+    config_30m.d_model = 512
+    config_30m.n_heads = 8
+    config_30m.d_ff = 2048
+    config_30m.baseline_n_layers = 6
+    config_30m.results_dir = "results/h100_benchmark/capacity_matched"
+    config_30m.figures_dir = "results/h100_benchmark/capacity_matched/figures"
+    
+    run_h100_benchmark(config_30m)
+    push_results_to_github(config_30m)
