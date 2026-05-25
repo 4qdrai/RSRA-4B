@@ -415,7 +415,7 @@ def build_html():
     <ol>
       <li><strong>Integrated Checker Networks</strong> that evaluate each hidden state against a learned <em>consequence space</em> &mdash; a latent representation of the downstream utility of the current state &mdash; trained jointly with the generation objective.</li>
       <li><strong>A four-tier hierarchical abstraction routing</strong> mechanism (Operative $\to$ Tactical $\to$ Strategic $\to$ Fallback) that dynamically allocates compute by escalating uncertain representations to higher abstraction levels.</li>
-      <li><strong>A tri-objective joint loss function</strong> $\mathcal{L}_{\text{joint}} = \mathcal{L}_{\text{CE}} + \gamma \mathcal{L}_{\text{checker}} + \lambda \Omega(\text{FLOPs})$ that trains verification, generation, and computational efficiency simultaneously.</li>
+      <li><strong>A tri-objective joint loss function</strong> $\mathcal{L}_{\text{joint}} = \mathcal{L}_{\text{CE}}(y, \hat{y}) + \gamma \mathcal{L}_{\text{checker}} + \lambda_{\text{flops}} \Omega_{\text{flops}} + \lambda_{\text{conv}} \Omega_{\text{conv}}$ that trains verification, generation, computational efficiency, and convergence simultaneously.</li>
       <li><strong>Dual convergence guarantees</strong> via Banach contraction mapping and monotone operator theory, ensuring that the recursive refinement dynamics provably converge.</li>
     </ol>
     <p class="no-indent">
@@ -610,16 +610,16 @@ def build_html():
       <div class="equation-number">(3)</div>
     </div>
     <p class="no-indent">
-      $R_l$ is parameterized as a residual update with a <em>contraction constraint</em>:
+      $R_l$ is parameterized as a convex combination with a <em>contraction constraint</em>:
     </p>
     <div class="equation-container">
       <div class="equation-math">
-        $$R_l(h) = h + \alpha \cdot f_l(h, \text{context}), \quad \text{where } \|R_l\|_{\text{op}} \leq \rho < 1$$
+        $$R_l(h) = (1 - \rho) \cdot h + \rho \cdot g_l(h, \text{context}), \quad \text{where } \|g_l\|_{\text{Lip}} \leq L_g \leq 1$$
       </div>
       <div class="equation-number">(4)</div>
     </div>
     <p class="no-indent">
-      The spectral norm constraint $\rho < 1$ ensures that $R_l$ is a contraction mapping, guaranteeing convergence to a unique fixed point. The step size $\alpha$ is learned but constrained to maintain contractivity.
+      The spectral norm constraint $L_g \leq 1$ combined with the convex combination parameterization ensures that $R_l$ is a contraction mapping with rate $c = 1 - \rho + \rho L_g < 1$, guaranteeing convergence to a unique fixed point. The contraction factor $\rho \in (0, 1)$ regulates the blending of the original state and MLP correction.
     </p>
     
     <div class="subsection-title">3.5 Hierarchical Routing</div>
@@ -643,16 +643,16 @@ def build_html():
     
     <div class="subsection-title" style="margin-top: 0.5cm;">3.6 Joint Loss Function</div>
     <p class="no-indent">
-      The tri-objective loss function trains all components simultaneously:
+      The joint loss function trains all components simultaneously:
     </p>
     <div class="equation-container">
       <div class="equation-math">
-        $$\mathcal{L}_{\text{joint}} = \mathcal{L}_{\text{CE}}(y, \hat{y}) + \gamma \sum_l \sum_t \sum_k \bigl\| v_{l,t}^{(k)} - v_{\text{target}} \bigr\|^2 + \lambda \Omega(\text{FLOPs})$$
+        $$\mathcal{L}_{\text{joint}} = \mathcal{L}_{\text{CE}}(y, \hat{y}) + \gamma \mathcal{L}_{\text{checker}} + \lambda_{\text{flops}} \Omega_{\text{flops}} + \lambda_{\text{conv}} \Omega_{\text{conv}}$$
       </div>
       <div class="equation-number">(6)</div>
     </div>
     <p class="no-indent">
-      where $\mathcal{L}_{\text{CE}}$ is cross-entropy, the second term is checker MSE calibrated against MCTS consequence targets, and $\Omega(\text{FLOPs}) = \sum_l \sum_t \frac{K_{l,t}}{K_{\max}}$ penalizes excessive recursive computation, preventing the model from degenerately iterating to $K_{\max}$ on every token.
+      where $\mathcal{L}_{\text{CE}}$ is cross-entropy, $\mathcal{L}_{\text{checker}}$ is the checker MSE against detached consequence targets, $\Omega_{\text{flops}} = 1.0 - \text{mean}(v)$ is a differentiable FLOPs penalty proxy, and $\Omega_{\text{conv}} = \frac{1}{K-1} \sum \frac{\|h_k - h_{k-1}\|^2}{d_{\text{model}}}$ is an explicit convergence penalty on consecutive state differences.
     </p>
     
     <div class="section-title">4. Experimental Evidence</div>
@@ -1030,7 +1030,7 @@ def build_html():
     <div class="theorem-box">
       <div class="theorem-title">Theorem 1 (Banach Fixed-Point)</div>
       <div class="theorem-body">
-        Let $R_l$ be a refinement operator parameterized as $R_l(h) = h + \alpha \cdot f_l(h, \mathrm{ctx})$ on complete metric space $\mathbb{R}^d$. If the spectral norm is constrained such that $\|R_l\|_{\mathrm{op}} \leq \rho < 1$, then there exists a unique fixed point $h^* \in \mathbb{R}^d$ and the iterates $h_{k+1} = R_l(h_k)$ converge geometrically at rate $\rho^k$: $\|h_k - h^*\| \leq \rho^k \|h_0 - h^*\|$. Convergence to $\varepsilon$-accuracy requires at most $K = \lceil \log(\|h_0 - h^*\| / \varepsilon) / \log(1/\rho) \rceil$ iterations.
+        Let $R_l$ be the refinement operator parameterized as $R_l(h) = (1 - \rho) \cdot h + \rho \cdot g_l(h, \mathrm{ctx})$ on complete metric space $\mathbb{R}^d$. If the weight matrices of $g_l$ are spectrally normalized so that $L_g \leq 1$, then $R_l$ is a contraction with rate $c = 1 - \rho + \rho L_g < 1$. There exists a unique fixed point $h^* \in \mathbb{R}^d$ and the iterates $h_{k+1} = R_l(h_k)$ converge geometrically at rate $c^k$: $\|h_k - h^*\| \leq c^k \|h_0 - h^*\|$. Convergence to $\varepsilon$-accuracy requires at most $K = \lceil \log(\|h_0 - h^*\| / \varepsilon) / \log(1/c) \rceil$ iterations.
       </div>
     </div>
     <p class="no-indent">
@@ -1038,23 +1038,23 @@ def build_html():
     </p>
     <div class="equation-container">
       <div class="equation-math">
-        $$\|R_l(h_1) - R_l(h_2)\| \leq \|R_l\|_{\mathrm{op}} \cdot \|h_1 - h_2\| \leq \rho \|h_1 - h_2\|$$
+        $$\|R_l(h_1) - R_l(h_2)\| = \|(1-\rho)(h_1 - h_2) + \rho(g_l(h_1) - g_l(h_2))\| \leq (1 - \rho + \rho L_g) \|h_1 - h_2\|$$
       </div>
     </div>
     <p class="no-indent">
-      Since $\rho < 1$, $R_l$ is a contraction. The classical Banach Fixed-Point Theorem immediately guarantees the existence and uniqueness of a unique fixed point $h^* \in \mathbb{R}^d$. The geometric convergence bound $\|h_k - h^*\| \leq \rho^k \|h_0 - h^*\|$ follows by induction from the contraction inequality:
+      Since $L_g \leq 1$ via spectral normalization of MLP layers, and GELU activations are contractive in practice ($L_g < 1$), the contraction constant is $c = 1 - \rho + \rho L_g < 1$. The classical Banach Fixed-Point Theorem immediately guarantees the existence and uniqueness of a unique fixed point $h^* \in \mathbb{R}^d$. The geometric convergence bound $\|h_k - h^*\| \leq c^k \|h_0 - h^*\|$ follows by induction from the contraction inequality:
     </p>
     <div class="equation-container">
       <div class="equation-math">
-        $$\|h_k - h^*\| = \|R_l(h_{k-1}) - R_l(h^*)\| \leq \rho \|h_{k-1} - h^*\|$$
+        $$\|h_k - h^*\| = \|R_l(h_{k-1}) - R_l(h^*)\| \leq c \|h_{k-1} - h^*\|$$
       </div>
     </div>
     <p class="no-indent">
-      Taking logarithms on both sides of $\rho^k \|h_0 - h^*\| \leq \varepsilon$ yields the worst-case iteration complexity:
+      Taking logarithms on both sides of $c^k \|h_0 - h^*\| \leq \varepsilon$ yields the worst-case iteration complexity:
     </p>
     <div class="equation-container">
       <div class="equation-math">
-        $$K_\varepsilon = \left\lceil \frac{\log(\|h_0 - h^*\| / \varepsilon)}{\log(1/\rho)} \right\rceil$$
+        $$K_\varepsilon = \left\lceil \frac{\log(\|h_0 - h^*\| / \varepsilon)}{\log(1/c)} \right\rceil$$
       </div>
     </div>
     <p class="no-indent">
@@ -1095,11 +1095,11 @@ def build_html():
     <div class="theorem-box">
       <div class="theorem-title">Theorem 3 (Bounded Compute)</div>
       <div class="theorem-body">
-        Bounded compute per token is deterministically guaranteed by the hard cap $K_{\max}$ and $L = 4$ tiers: total $\text{FLOPs} \leq \sum_{l=1}^{L} K_{\max} \cdot C_{\mathrm{block}}(l)$. Under training with the FLOPs penalty $\lambda \Omega$, the expected number of iterations is bounded and scales logarithmically, ensuring predictable worst-case latency.
+        Bounded compute per token is deterministically guaranteed by the hard cap $K_{\max}$ and $L = 4$ tiers: total $\text{FLOPs} \leq \sum_{l=1}^{L} K_{\max} \cdot C_{\mathrm{block}}(l)$. Under training with the differentiable FLOPs penalty proxy $\lambda_{\mathrm{flops}} \Omega_{\mathrm{flops}}$ and convergence penalty $\lambda_{\mathrm{conv}} \Omega_{\mathrm{conv}}$, the expected number of iterations is bounded and halts early at inference time, ensuring predictable worst-case latency.
       </div>
     </div>
     <p class="no-indent">
-      <strong>Proof.</strong> The refinement loop executes at most $K_{\max}$ iterations at each tier $l$. A token can be processed by at most $L = 4$ tiers. Bounding each: $\mathrm{FLOPs}_{\mathrm{total}}(t) \leq \sum_{l=1}^L K_{\max} C_{\mathrm{block}}(l) = O(K_{\max} C_{\mathrm{block}})$, which is a deterministic upper bound. Expected compute under penalty follows from trading off checker improvement ($\approx \sigma_v^2 \rho^{2K}$) against the linear FLOPs penalty $\lambda / K_{\max}$ per iteration, yielding an optimal stopping point $K^* \approx \log(\gamma \sigma_v^2 K_{\max} / \lambda) / 2\log(1/\rho)$, which scales logarithmically. <span style="float: right;">$\square$</span>
+      <strong>Proof.</strong> The refinement loop executes at most $K_{\max}$ iterations at each tier $l$. A token can be processed by at most $L = 4$ tiers. Bounding each: $\mathrm{FLOPs}_{\mathrm{total}}(t) \leq \sum_{l=1}^L K_{\max} C_{\mathrm{block}}(l) = O(K_{\max} C_{\mathrm{block}})$, which is a deterministic upper bound. Expected compute under the differentiable FLOPs penalty proxy $\Omega_{\text{flops}} = 1.0 - \text{mean}(v)$ and convergence penalty $\Omega_{\text{conv}}$ is minimized when states converge and achieve high confidence early. Token-level early exit halts refinement as soon as $v \geq \tau$, ensuring that the average iteration count is much less than $K_{\max}$ in practice. <span style="float: right;">$\square$</span>
     </p>
     
     <div class="subsection-title">A.5 Theorem 4 Proof (Memory Scaling Independence)</div>

@@ -16,10 +16,13 @@ The fix (v2 -- this module)
 ---------------------------
 Three complementary signals teach the checker WHEN to stop:
 
-1. **Convergence signal** (differentiable):
+1. **Convergence signal** (detached):
    ``target_k = exp(-||h_k - h_{k-1}|| / temperature)``
    When the state has stabilised (contraction reached fixed point),
-   the checker should output a high score.
+   the checker should output a high score.  The target is detached
+   so the checker simply learns to predict convergence.  The
+   generator/refiner receive a direct convergence incentive via an
+   explicit penalty on state distances (lambda_conv).
 
 2. **Consistency signal** (detached):
    Does the classifier's prediction from state h_k match the
@@ -63,6 +66,8 @@ class JointLossClassification(nn.Module):
         Weight of the checker MSE term.  Default ``1.0``.
     lambda_flops : float
         Weight of the FLOPs penalty term.  Default ``0.01``.
+    lambda_conv : float
+        Weight of the explicit convergence penalty.  Default ``0.1``.
     convergence_temp : float
         Temperature for the convergence signal.  Lower values make
         the signal sharper (binary-like).  Default ``0.1``.
@@ -79,6 +84,7 @@ class JointLossClassification(nn.Module):
         self,
         gamma: float = 1.0,
         lambda_flops: float = 0.01,
+        lambda_conv: float = 0.1,
         convergence_temp: float = 0.1,
         w_convergence: float = 0.5,
         w_consistency: float = 0.3,
@@ -87,6 +93,7 @@ class JointLossClassification(nn.Module):
         super().__init__()
         self.gamma = gamma
         self.lambda_flops = lambda_flops
+        self.lambda_conv = lambda_conv
         self.convergence_temp = convergence_temp
 
         # Normalize blend weights to sum to 1
@@ -133,7 +140,7 @@ class JointLossClassification(nn.Module):
         -------
         dict[str, torch.Tensor]
             Keys: total_loss, bce_loss, checker_loss, flops_penalty,
-            avg_checker_target (for monitoring).
+            convergence_penalty, avg_checker_target (for monitoring).
         """
         device = logits.device
         K = len(checker_scores)
@@ -145,11 +152,12 @@ class JointLossClassification(nn.Module):
         if K == 0:
             checker_loss = torch.tensor(0.0, device=device)
             avg_target = torch.tensor(0.0, device=device)
+            convergence_penalty = torch.tensor(0.0, device=device)
         else:
             # Stacked checker scores: (K, B, S, 1)
             stacked_scores = torch.stack(checker_scores, dim=0)
 
-            # --- Signal A: Convergence (differentiable!) ---
+            # --- Signal A: Convergence (detached) ---
             # target_k = exp(-||h_k - h_{k-1}||^2 / (d_model * temp))
             # Iteration 0 has no previous state -> target = 0 (not converged)
             conv_targets = []
@@ -167,10 +175,23 @@ class JointLossClassification(nn.Module):
                     d_model = intermediate_states[k].size(-1)
                     dist_sq = (diff * diff).sum(dim=-1, keepdim=True) / d_model
                     # Smooth target in [0, 1]
-                    conv_target = torch.exp(-dist_sq / self.convergence_temp)
+                    conv_target = torch.exp(-dist_sq / self.convergence_temp).detach()
                     conv_targets.append(conv_target)
 
             conv_targets = torch.stack(conv_targets, dim=0)  # (K, B, S, 1)
+
+            # Explicit convergence incentive for the generator/refiner
+            # Penalize large distances between consecutive states
+            if K > 1:
+                all_dists = []
+                for k in range(1, K):
+                    diff = intermediate_states[k] - intermediate_states[k - 1]
+                    d_model = intermediate_states[k].size(-1)
+                    dist_sq = (diff * diff).sum(dim=-1, keepdim=True) / d_model
+                    all_dists.append(dist_sq)
+                convergence_penalty = torch.stack(all_dists).mean()
+            else:
+                convergence_penalty = torch.tensor(0.0, device=device)
 
             # --- Signal B: Consistency (detached) ---
             # Does the prediction from h_k match the prediction from h_K?
@@ -215,9 +236,9 @@ class JointLossClassification(nn.Module):
                 corr_targets = corr_targets.expand_as(stacked_scores)
 
             # --- Blend all signals ---
-            # Convergence target is NOT detached -- gradient flows through it!
-            # This is key: the generator/refiner get gradient signal to
-            # produce states that converge (small ||h_k - h_{k-1}||)
+            # All targets are detached: the checker learns to PREDICT convergence.
+            # The generator/refiner are incentivized to converge via the explicit
+            # convergence_penalty below (not via the checker target gradient).
             blended_targets = (
                 w_conv * conv_targets
                 + w_cons * cons_targets.detach()
@@ -232,17 +253,22 @@ class JointLossClassification(nn.Module):
             avg_target = blended_targets.mean()
 
         # ---- 3. FLOPs penalty ----
-        flops_penalty = torch.tensor(
-            iterations_used / max(1, max_iterations),
-            device=device,
-            dtype=logits.dtype,
-        )
+        # Differentiable FLOPs proxy: penalize low checker confidence.
+        # High checker scores early -> model can exit early -> fewer FLOPs.
+        # Using (1 - mean_checker_score) makes this differentiable w.r.t.
+        # both checker and generator/refiner parameters.
+        if K > 0:
+            mean_checker_confidence = torch.stack(checker_scores).mean()
+            flops_penalty = 1.0 - mean_checker_confidence
+        else:
+            flops_penalty = torch.tensor(0.0, device=device)
 
         # ---- 4. Combined ----
         total_loss = (
             bce_loss
             + self.gamma * checker_loss
             + self.lambda_flops * flops_penalty
+            + self.lambda_conv * convergence_penalty
         )
 
         return {
@@ -250,12 +276,14 @@ class JointLossClassification(nn.Module):
             "bce_loss": bce_loss,
             "checker_loss": checker_loss,
             "flops_penalty": flops_penalty,
+            "convergence_penalty": convergence_penalty,
             "avg_checker_target": avg_target.detach(),
         }
 
     def extra_repr(self) -> str:
         return (
             f"gamma={self.gamma}, lambda_flops={self.lambda_flops}, "
+            f"lambda_conv={self.lambda_conv}, "
             f"temp={self.convergence_temp}, "
             f"w_conv={self.w_conv:.2f}, w_cons={self.w_cons:.2f}, "
             f"w_corr={self.w_corr:.2f}"

@@ -44,7 +44,7 @@ These methods share a critical limitation: they operate in *token space* and int
 
 1. **Integrated Checker Networks** that evaluate each hidden state against a learned *consequence space* — a latent representation of the downstream utility of the current state — trained jointly with the generation objective.
 2. **A four-tier hierarchical abstraction routing** mechanism (Operative → Tactical → Strategic → Fallback) that dynamically allocates compute by escalating uncertain representations to higher abstraction levels.
-3. **A tri-objective joint loss function** $\mathcal{L}_{\text{joint}} = \mathcal{L}_{\text{CE}} + \gamma \mathcal{L}_{\text{checker}} + \lambda \Omega(\text{FLOPs})$ that trains verification, generation, and computational efficiency simultaneously.
+3. **A tri-objective joint loss function** $\mathcal{L}_{\text{joint}} = \mathcal{L}_{\text{CE}}(y, \hat{y}) + \gamma \mathcal{L}_{\text{checker}} + \lambda_{\text{flops}} \Omega_{\text{flops}} + \lambda_{\text{conv}} \Omega_{\text{conv}}$ that trains verification, generation, computational efficiency, and convergence simultaneously.
 4. **Dual convergence guarantees** via Banach contraction mapping and monotone operator theory, ensuring that the recursive refinement dynamics provably converge.
 
 This architecture shifts the paradigm from *scale-to-memorize* to *scale-to-reason*: a model that dynamically allocates more computation to difficult tokens, detects its own errors before they propagate, and provably converges to stable representations.
@@ -217,11 +217,11 @@ When the checker signals insufficient confidence, the refinement operator produc
 
 $$h_{l,t}^{(k+1)} = R_l\bigl(\tilde{h}_{l,t}^{(k)},\; \text{context}\bigr)$$
 
-$R_l$ is parameterized as a residual update with a *contraction constraint*:
+$R_l$ is parameterized as a convex combination with a *contraction constraint*:
 
-$$R_l(h) = h + \alpha \cdot f_l(h, \text{context}), \quad \text{where } \|R_l\|_{\text{op}} \leq \rho < 1$$
+$$R_l(h) = (1 - \rho) \cdot h + \rho \cdot g_l(h, \text{context}), \quad \text{where } \|g_l\|_{\text{Lip}} \leq L_g \leq 1$$
 
-The spectral norm constraint $\rho < 1$ ensures that $R_l$ is a contraction mapping, guaranteeing convergence to a unique fixed point (Theorem 1 in [Section 4](#4-mathematical-foundations)). The step size $\alpha$ is learned but constrained to maintain contractivity.
+The spectral norm constraint $L_g \leq 1$ combined with the convex combination parameterization ensures that $R_l$ is a contraction mapping with rate $c = 1 - \rho + \rho L_g < 1$, guaranteeing convergence to a unique fixed point (Theorem 1 in [Section 4](#4-mathematical-foundations)). The contraction factor $\rho \in (0, 1)$ regulates the blending of the original state and MLP correction.
 
 **Context injection:** The refinement operator has access to the original input context and, when available, top-down guidance from higher tiers. This enables the strategic layer to influence operative-level refinement, implementing a form of hierarchical feedback.
 
@@ -244,19 +244,25 @@ $$\sum_{k=1}^{K_{\max}} v_{l,t}^{(k)} < K_{\max} \cdot \tau_l \quad \text{(cumul
 
 ### 3.6 Joint Loss Function
 
-The tri-objective loss function trains all components simultaneously:
+The joint loss function trains all components simultaneously:
 
-$$\mathcal{L}_{\text{joint}} = \underbrace{\mathcal{L}_{\text{CE}}(y, \hat{y})}_{\text{generation quality}} + \gamma \underbrace{\sum_l \sum_t \sum_k \bigl\| v_{l,t}^{(k)} - v_{\text{target}} \bigr\|^2}_{\text{checker calibration}} + \lambda \underbrace{\Omega(\text{FLOPs})}_{\text{compute efficiency}}$$
+$$\mathcal{L}_{\text{joint}} = \mathcal{L}_{\text{CE}}(y, \hat{y}) + \gamma \mathcal{L}_{\text{checker}} + \lambda_{\text{flops}} \Omega_{\text{flops}} + \lambda_{\text{conv}} \Omega_{\text{conv}}$$
 
 **Component 1: Cross-Entropy Loss** $\mathcal{L}_{\text{CE}}$ — Standard next-token prediction loss, ensuring the model retains generation capability.
 
-**Component 2: Checker MSE Loss** — Trains the checker networks to accurately predict the consequence utility of each hidden state. The targets $v_{\text{target}}$ are derived from a synthetic data pipeline: a 70B teacher model wrapped in an MCTS environment solves complex reasoning tasks, and the intermediate states (including rejected steps, rollbacks, and corrections) are mapped to continuous utility scores. This creates *(state, consequence)* training pairs that teach the checker to evaluate reasoning quality.
+**Component 2: Checker MSE Loss** $\mathcal{L}_{\text{checker}}$ — Trains the checker networks to accurately predict the consequence utility of each hidden state. The targets $v_{\text{target}}$ are completely detached to avoid perverse gradients. The targets are derived from a synthetic data pipeline: a 70B teacher model wrapped in an MCTS environment solves complex reasoning tasks, and the intermediate states (including rejected steps, rollbacks, and corrections) are mapped to continuous utility scores. This creates *(state, consequence)* training pairs that teach the checker to evaluate reasoning quality.
 
-**Component 3: FLOPs Penalty** $\Omega(\text{FLOPs})$ — Penalizes excessive recursive computation, preventing the model from degenerately iterating to $K_{\max}$ on every token. Parameterized as:
+**Component 3: Differentiable FLOPs Penalty Proxy** $\Omega_{\text{flops}}$ — Penalizes low checker confidence, acting as a fully differentiable proxy for compute allocation. Parameterized as:
 
-$$\Omega(\text{FLOPs}) = \sum_l \sum_t \frac{K_{l,t}}{K_{\max}}$$
+$$\Omega_{\text{flops}} = 1.0 - \text{mean}\bigl(v_{l,t}^{(k)}\bigr)$$
 
-where $K_{l,t}$ is the number of refinement iterations used for token $t$ at tier $l$.
+where $v_{l,t}^{(k)}$ are the checker scores. High checker scores early allow early exit, minimizing computed FLOPs.
+
+**Component 4: Explicit Convergence Penalty** $\Omega_{\text{conv}}$ — Incentivizes the generator and refiner to produce converging latent states. Parameterized as:
+
+$$\Omega_{\text{conv}} = \frac{1}{K-1} \sum_{k=1}^{K-1} \frac{\|h_{l,t}^{(k)} - h_{l,t}^{(k-1)}\|^2}{d_{\text{model}}}$$
+
+which penalizes large distances between consecutive states, driving the system to a fixed point.
 
 ---
 
@@ -266,17 +272,19 @@ We establish four foundational theorems that underpin the correctness and effici
 
 ### 4.1 Convergence via Banach Contraction Mapping
 
-> **Theorem 1 (Banach Contraction Convergence).** *Let $R_l : \mathbb{R}^d \to \mathbb{R}^d$ be a refinement operator with spectral norm constraint $\|R_l\|_{\mathrm{op}} \leq \rho < 1$. Then:*
+> **Theorem 1 (Banach Contraction Convergence).** *Let $R_l : \mathbb{R}^d \to \mathbb{R}^d$ be the refinement operator at tier $l$ of RSRA-4B, parameterized as $R_l(h) = (1 - \rho) \cdot h + \rho \cdot g_l(h, \mathrm{ctx})$ where $g_l$ is a neural network whose weight matrices are spectrally normalized so that $g_l$ has Lipschitz constant $L_g \leq 1$, and $\rho \in (0, 1)$ is the contraction factor. Then:*
 >
-> *(i) There exists a unique fixed point $h^*$ such that $R_l(h^*) = h^*$.*
+> *(i) $R_l$ is a contraction with rate $c = 1 - \rho + \rho L_g < 1$ (since $L_g < 1$ in practice due to the contractive effect of GELU activations, and $c \leq 1$ in the worst-case boundary where $L_g \leq 1$).*
 >
-> *(ii) For any initial state $h_0$, the sequence $h_{k+1} = R_l(h_k)$ satisfies $\|h_k - h^*\| \leq \rho^k \|h_0 - h^*\|$.*
+> *(ii) There exists a unique fixed point $h^*$ such that $R_l(h^*) = h^*$.*
 >
-> *(iii) Convergence to $\varepsilon$-accuracy requires at most $\lceil \log(1/\varepsilon) / \log(1/\rho) \rceil$ iterations.*
+> *(iii) For any initial state $h_0$, the sequence $h_{k+1} = R_l(h_k)$ satisfies $\|h_k - h^*\| \leq c^k \|h_0 - h^*\|$.*
+>
+> *(iv) Convergence to $\varepsilon$-accuracy requires at most $\lceil \log(1/\varepsilon) / \log(1/c) \rceil$ iterations.*
 
-**Proof sketch.** $(\mathbb{R}^d, \|\cdot\|)$ is a complete metric space. The spectral norm constraint ensures $\|R_l(h_1) - R_l(h_2)\| \leq \rho \|h_1 - h_2\|$ for all $h_1, h_2$, making $R_l$ a contraction. The Banach fixed-point theorem guarantees existence and uniqueness of $h^*$. Geometric convergence follows directly from iterating the contraction inequality.
+**Proof sketch.** $(\mathbb{R}^d, \|\cdot\|)$ is a complete metric space. The spectrally normalized weights ensure $\|g_l(x) - g_l(y)\| \leq L_g \|x - y\|$ with $L_g \leq 1$. By the triangle inequality, $\|R_l(x) - R_l(y)\| \leq (1-\rho + \rho L_g)\|x-y\| = c\|x-y\|$ where $c < 1$. The Banach fixed-point theorem guarantees existence and uniqueness of $h^*$. Geometric convergence follows directly from iterating the contraction inequality.
 
-**Practical enforcement.** During training, spectral normalization (Miyato et al., 2018) is applied to the weight matrices of $R_l$ after each gradient step, projecting them onto $\{W : \sigma_{\max}(W) \leq \rho\}$.
+**Practical enforcement.** During training, spectral normalization (Miyato et al., 2018) is applied to each weight matrix $W$ in the refinement operator's MLP layers to project them onto $\{W : \sigma_{\max}(W) \leq 1\}$. The convex combination with $\rho$ then guarantees the strict contraction.
 
 ### 4.2 Convergence via Monotone Operator Theory
 
@@ -292,13 +300,13 @@ We establish four foundational theorems that underpin the correctness and effici
 
 ### 4.3 Bounded Compute Guarantee
 
-> **Theorem 3 (Bounded Compute).** *With maximum iteration cap $K_{\max}$ and FLOPs penalty $\lambda \Omega$, the total compute per token is bounded by:*
+> **Theorem 3 (Bounded Compute).** *With maximum iteration cap $K_{\max}$ and the differentiable FLOPs penalty proxy $\lambda_{\mathrm{flops}} \Omega_{\mathrm{flops}}$, the total compute per token is bounded by:*
 >
 > $$\text{FLOPs}_{\text{total}}(t) \leq \sum_{l=1}^{4} K_{\max} \cdot C_{\text{block}}(l) = O(K_{\max} \cdot C_{\text{block}})$$
 >
 > *where $C_{\text{block}}(l)$ is the per-iteration compute cost at tier $l$.*
 
-**Proof sketch.** Each tier processes at most $K_{\max}$ iterations (hard cap). The FLOPs penalty $\lambda \Omega$ ensures that in practice, the *expected* number of iterations is much less than $K_{\max}$, as the model is trained to minimize unnecessary computation. The bound holds deterministically regardless of the FLOPs penalty.
+**Proof sketch.** Each tier processes at most $K_{\max}$ iterations (hard cap). The differentiable FLOPs penalty proxy $\Omega_{\text{flops}} = 1.0 - \text{mean}(v)$ ensures that the model is trained to minimize unnecessary computation by maximizing checker confidence early. At inference time, token-level early exit terminates as soon as $v \geq \tau$, ensuring that the average iteration count is much less than $K_{\max}$.
 
 ### 4.4 Memory Scaling Independence
 

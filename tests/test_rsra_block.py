@@ -193,6 +193,11 @@ class TestGradientFlow:
                 # LayerNorm in refiner is bypassed in Banach mode
                 if 'refiner.norm.' in name:
                     continue
+                # Fix A: checker score is detached in refiner, so the
+                # checker only gets gradients through the joint loss
+                # (via checker_loss), not through output_state.sum().
+                if name.startswith('checker.'):
+                    continue
                 assert p.grad is not None, (
                     f"No grad for {name}"
                 )

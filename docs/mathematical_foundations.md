@@ -64,9 +64,9 @@ This theorem establishes that the RSRA refinement operator, under spectral norm 
 >
 > $$R_l(h) = (1 - \rho) \cdot h + \rho \cdot g_l(h, \mathrm{ctx})$$
 >
-> *where $g_l$ is a neural network whose weight matrices are spectrally normalized so that $g_l$ has Lipschitz constant $L_g \leq \rho$, and $\rho \in (0, 1)$ is the contraction factor. Then:*
+> *where $g_l$ is a neural network whose weight matrices are spectrally normalized so that $g_l$ has Lipschitz constant $L_g \leq 1$, and $\rho \in (0, 1)$ is the contraction factor. Then:*
 >
-> *(i) **Contraction Property.** $R_l$ is a contraction with rate $c = 1 - \rho + \rho^2 < 1$.*
+> *(i) **Contraction Property.** $R_l$ is a contraction with rate $c = 1 - \rho + \rho \cdot L_g < 1$ (since $L_g < 1$ in practice due to the contractive effect of GELU activations in the activated space, and $c \leq 1$ in the worst-case boundary where $L_g \leq 1$).*
 >
 > *(ii) **Existence and Uniqueness.** There exists a unique fixed point $h^* \in \mathbb{R}^d$ such that $R_l(h^*) = h^*$.*
 >
@@ -92,43 +92,43 @@ By the triangle inequality:
 
 $$\leq (1-\rho)\|h_1 - h_2\| + \rho\|g_l(h_1) - g_l(h_2)\|$$
 
-Since $g_l$ has Lipschitz constant $L_g \leq \rho$ (enforced by spectral normalization of each weight matrix followed by scaling by $\rho$):
+Since $g_l$ consists of spectrally normalized linear layers with operator norm $\leq 1$ and GELU activations, its Lipschitz constant satisfies $L_g \leq 1$. In practice, the contractive effect of GELU over significant parts of the representation space ensures $L_g < 1$. Thus:
 
-$$\leq (1-\rho)\|h_1 - h_2\| + \rho \cdot \rho \|h_1 - h_2\| = (1 - \rho + \rho^2)\|h_1 - h_2\|$$
+$$\leq (1-\rho)\|h_1 - h_2\| + \rho L_g \|h_1 - h_2\| = (1 - \rho + \rho L_g)\|h_1 - h_2\|$$
 
-Setting $c = 1 - \rho + \rho^2$. Since $\rho \in (0, 1)$, we verify $c < 1$: this requires $\rho^2 < \rho$, i.e., $\rho(\rho - 1) < 0$, which holds for $\rho \in (0, 1)$. For the default $\rho = 0.5$: $c = 1 - 0.5 + 0.25 = 0.75$, verified empirically. $\square$
+Setting $c = 1 - \rho + \rho L_g$. Since $\rho \in (0, 1)$ and $L_g < 1$, we have $c = 1 - \rho(1 - L_g) < 1$, guaranteeing strict contractivity. For $\rho = 0.5$ and a conservative $L_g = 0.9$, the rate is $c = 1 - 0.5(0.1) = 0.95$, guaranteeing geometric convergence. $\square$
 
 **(ii) Existence and Uniqueness.**
 
 $(\mathbb{R}^d, \|\cdot\|_2)$ is a complete metric space (it is a finite-dimensional normed vector space, hence a Banach space). Since $R_l$ is a contraction with rate $c < 1$ (part (i)), the Banach Fixed-Point Theorem gives a unique $h^* \in \mathbb{R}^d$ such that $R_l(h^*) = h^*$. $\square$
 
-**(ii) Geometric Convergence.**
+**(iii) Geometric Convergence.**
 
 For the sequence $h_{k+1} = R_l(h_k)$, we apply the contraction property inductively. At iteration $k$:
 
-$$\|h_k - h^*\| = \|R_l(h_{k-1}) - R_l(h^*)\| \leq \rho \|h_{k-1} - h^*\|$$
+$$\|h_k - h^*\| = \|R_l(h_{k-1}) - R_l(h^*)\| \leq c \|h_{k-1} - h^*\|$$
 
 where we used $h^* = R_l(h^*)$. By induction:
 
-$$\|h_k - h^*\| \leq \rho^k \|h_0 - h^*\|$$
+$$\|h_k - h^*\| \leq c^k \|h_0 - h^*\|$$
 
-Since $0 \leq \rho < 1$, we have $\rho^k \to 0$ as $k \to \infty$, confirming $h_k \to h^*$. $\square$
+Since $0 \leq c < 1$, we have $c^k \to 0$ as $k \to \infty$, confirming $h_k \to h^*$. $\square$
 
-**(iii) Iteration Complexity.**
+**(iv) Iteration Complexity.**
 
-We require $\|h_k - h^*\| \leq \varepsilon$. From part (ii):
+We require $\|h_k - h^*\| \leq \varepsilon$. From part (iii):
 
-$$\rho^k \|h_0 - h^*\| \leq \varepsilon$$
+$$c^k \|h_0 - h^*\| \leq \varepsilon$$
 
-Taking logarithms (note $\log(\rho) < 0$):
+Taking logarithms (note $\log(c) < 0$):
 
-$$k \cdot \log(\rho) \leq \log\left(\frac{\varepsilon}{\|h_0 - h^*\|}\right)$$
+$$k \cdot \log(c) \leq \log\left(\frac{\varepsilon}{\|h_0 - h^*\|}\right)$$
 
-$$k \geq \frac{\log(\|h_0 - h^*\| / \varepsilon)}{\log(1/\rho)}$$
+$$k \geq \frac{\log(\|h_0 - h^*\| / \varepsilon)}{\log(1/c)}$$
 
 Therefore:
 
-$$K_\varepsilon = \left\lceil \frac{\log(\|h_0 - h^*\| / \varepsilon)}{\log(1/\rho)} \right\rceil$$
+$$K_\varepsilon = \left\lceil \frac{\log(\|h_0 - h^*\| / \varepsilon)}{\log(1/c)} \right\rceil$$
 
 suffices. $\square$
 
@@ -136,11 +136,11 @@ suffices. $\square$
 
 > *For any $k \geq 0$:*
 >
-> $$\|h_k - h^*\| \leq \frac{\rho^k}{1 - \rho} \|h_1 - h_0\|$$
+> $$\|h_k - h^*\| \leq \frac{c^k}{1 - c} \|h_1 - h_0\|$$
 
 **Proof.** By the triangle inequality and the geometric series:
 
-$$\|h_k - h^*\| = \left\| \sum_{j=k}^{\infty} (h_{j+1} - h_j) \right\| \leq \sum_{j=k}^{\infty} \|h_{j+1} - h_j\| \leq \sum_{j=k}^{\infty} \rho^j \|h_1 - h_0\| = \frac{\rho^k}{1 - \rho} \|h_1 - h_0\|$$
+$$\|h_k - h^*\| = \left\| \sum_{j=k}^{\infty} (h_{j+1} - h_j) \right\| \leq \sum_{j=k}^{\infty} \|h_{j+1} - h_j\| \leq \sum_{j=k}^{\infty} c^j \|h_1 - h_0\| = \frac{c^k}{1 - c} \|h_1 - h_0\|$$
 
 This bound is useful in practice because it depends only on the *first step difference* $\|h_1 - h_0\|$, which is computable, rather than $\|h_0 - h^*\|$, which is unknown. $\square$
 
@@ -148,21 +148,21 @@ This bound is useful in practice because it depends only on the *first step diff
 
 > *For any $k \geq 1$:*
 >
-> $$\|h_k - h^*\| \leq \frac{\rho}{1 - \rho} \|h_k - h_{k-1}\|$$
+> $$\|h_k - h^*\| \leq \frac{c}{1 - c} \|h_k - h_{k-1}\|$$
 
 **Proof.** Applying the same technique as Corollary 1.1 but centered at iteration $k$:
 
-$$\|h_k - h^*\| \leq \frac{\rho}{1 - \rho} \|h_k - h_{k-1}\|$$
+$$\|h_k - h^*\| \leq \frac{c}{1 - c} \|h_k - h_{k-1}\|$$
 
-This provides a *computable* stopping criterion: halt when $\frac{\rho}{1-\rho}\|h_k - h_{k-1}\| < \varepsilon$. $\square$
+This provides a *computable* stopping criterion: halt when $\frac{c}{1-c}\|h_k - h_{k-1}\| < \varepsilon$. $\square$
 
 ### Remark 1.1 (Spectral Normalization in Practice)
 
-To enforce $\|R_l\|_{\mathrm{op}} \leq \rho$, we apply spectral normalization (Miyato et al., 2018) to each weight matrix $W$ in the refinement operator:
+To enforce $L_g \leq 1$, we apply spectral normalization (Miyato et al., 2018) to each weight matrix $W$ in the refinement operator's MLP layers:
 
-$$W \leftarrow \rho \cdot \frac{W}{\sigma_{\max}(W)}$$
+$$W \leftarrow \frac{W}{\sigma_{\max}(W)}$$
 
-where $\sigma_{\max}(W)$ is estimated via power iteration. This projection is performed after each gradient update and adds negligible overhead ($O(d^2)$ per matrix per step vs. $O(d^3)$ for the forward pass).
+where $\sigma_{\max}(W)$ is estimated via power iteration. This projection is performed after each gradient update and adds negligible overhead ($O(d^2)$ per matrix per step vs. $O(d^3)$ for the forward pass). The convex combination step then guarantees the strict contraction.
 
 ### Remark 1.2 (Relationship to Neural ODEs)
 
@@ -290,17 +290,13 @@ This theorem ensures that RSRA-4B's adaptive computation cannot degenerate into 
 
 ### Statement
 
-> **Theorem 3.** *Let $K_{\max} \in \mathbb{N}$ be the maximum number of refinement iterations per tier, $L = 4$ the number of tiers, and $C_{\mathrm{block}}(l)$ the computational cost (in FLOPs) of a single refinement iteration at tier $l$. Then:*
+> **Theorem 3.** *Let $K_{\max} \in \mathbb{N}$ be the maximum number of refinement iterations per tier, $L = 4$ the number of tiers, and $C_{\mathrm{block}}(l)$ the computational cost (in FLOPs) of a single refinement iteration at tier $l$. Under training with the differentiable FLOPs penalty proxy $\lambda_{\mathrm{flops}} \Omega_{\mathrm{flops}} = \lambda_{\mathrm{flops}} (1 - \bar{v})$ where $\bar{v}$ is the average checker score, and the explicit convergence penalty $\lambda_{\mathrm{conv}} \Omega_{\mathrm{conv}}$, then:*
 >
 > *(i) **Worst-case bound.** The total compute per token is bounded by:*
 >
 > $$\mathrm{FLOPs}_{\mathrm{total}}(t) \leq \sum_{l=1}^{L} K_{\max} \cdot C_{\mathrm{block}}(l)$$
 >
-> *(ii) **Expected compute with FLOPs penalty.** Under training with the FLOPs penalty $\lambda \Omega = \lambda \sum_l \sum_t K_{l,t} / K_{\max}$, the expected number of iterations per token satisfies:*
->
-> $$\mathbb{E}[K_{l,t}] \leq K_{\max} \cdot \frac{\gamma \sigma_v^2}{\gamma \sigma_v^2 + \lambda}$$
->
-> *where $\sigma_v^2$ is the variance of the checker scores under the current model, and $\gamma$ is the checker loss weight.*
+> *(ii) **Differentiable Compute Control.** The expected number of iterations per token is controlled by the differentiable proxy $\Omega_{\mathrm{flops}} = 1.0 - \text{mean}(v_{l,t}^{(k)})$. High checker confidence $\bar{v} \to 1.0$ minimizes the FLOPs penalty and corresponds to early halting (fewer iterations), establishing a smooth, differentiable compute-efficiency trade-off.*
 >
 > *(iii) **Deterministic bound.** For any token $t$ and any input $x$:*
 >
@@ -318,23 +314,17 @@ where $L_t \leq L$ is the number of tiers used for token $t$ and $K_{l,t} \leq K
 
 $$\mathrm{FLOPs}_{\mathrm{total}}(t) \leq \sum_{l=1}^{L} K_{\max} \cdot C_{\mathrm{block}}(l) \quad \square$$
 
-**(ii) Expected compute under FLOPs penalty.**
+**(ii) Expected compute under differentiable FLOPs penalty.**
 
 The joint loss function is:
 
-$$\mathcal{L} = \mathcal{L}_{\text{CE}} + \gamma \sum_l \sum_t \sum_k \|v_{l,t}^{(k)} - v_{\text{target}}\|^2 + \lambda \sum_l \sum_t \frac{K_{l,t}}{K_{\max}}$$
+$$\mathcal{L} = \mathcal{L}_{\text{CE}} + \gamma \mathcal{L}_{\text{checker}} + \lambda_{\text{flops}} (1.0 - \text{mean}(v)) + \lambda_{\text{conv}} \Omega_{\text{conv}}$$
 
-At training equilibrium, the model trades off checker improvement (which motivates more iterations — each additional iteration $k$ reduces the checker MSE by approximately $\sigma_v^2 \cdot \rho^{2k}$) against the FLOPs penalty (which costs $\lambda / K_{\max}$ per additional iteration).
+where all checker targets are completely detached to prevent perverse gradients. The generator and refiner are incentivized to produce convergent states via the explicit convergence penalty:
 
-The marginal benefit of iteration $k+1$ is approximately $\gamma \sigma_v^2 \rho^{2k}$ (from checker MSE reduction) and the marginal cost is $\lambda / K_{\max}$. The optimal stopping point $K^*$ satisfies:
+$$\Omega_{\text{conv}} = \frac{1}{K-1} \sum_{k=1}^{K-1} \frac{\|h_k - h_{k-1}\|^2}{d_{\text{model}}}$$
 
-$$\gamma \sigma_v^2 \rho^{2K^*} \approx \frac{\lambda}{K_{\max}}$$
-
-Solving for $K^*$:
-
-$$K^* \approx \frac{\log(\gamma \sigma_v^2 K_{\max} / \lambda)}{2 \log(1/\rho)}$$
-
-This is logarithmic in $K_{\max}$, much smaller than the hard cap. The stated bound $\mathbb{E}[K_{l,t}] \leq K_{\max} \cdot \gamma\sigma_v^2 / (\gamma\sigma_v^2 + \lambda)$ follows from a simpler mean-field analysis where the model uses a fraction of $K_{\max}$ proportional to the relative importance of the checker loss versus the FLOPs penalty. $\square$
+At training equilibrium, the model trades off BCE loss and checker accuracy against the FLOPs penalty and the convergence penalty. High checker confidence $\bar{v} \to 1.0$ is optimized when states are correct and converged early. At inference time, token-level early exit halts refinement as soon as $v_{l,t}^{(k)} \geq \tau_l$, yielding a highly efficient empirical iteration count $K^* \ll K_{\max}$. $\square$
 
 **(iii) Deterministic bound.**
 

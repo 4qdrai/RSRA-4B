@@ -176,7 +176,15 @@ class RSRABlock(nn.Module):
         context: torch.Tensor | None = None,
         key_padding_mask: torch.Tensor | None = None,
     ) -> RSRABlockOutput:
-        """Execute the recursive generate-check-refine loop.
+        """Execute the recursive generate-check-refine loop with
+        token-level adaptive halting.
+
+        Each token position independently decides when to stop.  Once a
+        token's checker score ``>= tau``, that token's state is frozen --
+        it is NOT updated by the refiner in subsequent iterations.
+        However, frozen tokens still participate in self-attention (as
+        keys/values) in the generator so that active tokens can attend
+        to already-converged neighbors.
 
         Parameters
         ----------
@@ -197,22 +205,34 @@ class RSRABlock(nn.Module):
         Notes
         -----
         During training the loop always unrolls for *all*
-        ``max_iterations`` to allow gradient flow.  The output is the
-        **best accepted state** (highest mean checker score ≥ τ), or
-        the last generated state if no iteration was accepted.
+        ``max_iterations`` to allow gradient flow through every
+        iteration.  Frozen tokens are excluded from refinement via
+        ``torch.where`` (which is differentiable).
 
-        At inference time (``torch.no_grad()`` context), the loop
-        terminates early when the checker passes.
+        At inference time the loop terminates early once **all** active
+        token positions have converged (checker score ``>= tau``).
         """
         scores: list[torch.Tensor] = []
         states: list[torch.Tensor] = []
-        accepted = False
+        B, S, D = h.shape
+
+        # Token-level done mask: (B, S, 1) -- tracks which tokens have
+        # converged.  True = done (frozen), False = still active.
+        done_mask = torch.zeros(B, S, 1, dtype=torch.bool, device=h.device)
+
+        # If there is a padding mask, mark padded tokens as already done
+        # so they are never refined.
+        if key_padding_mask is not None:
+            done_mask = key_padding_mask.unsqueeze(-1)  # padded = True = done
+
+        best_state = h.clone()
+        best_scores_per_token = torch.zeros(B, S, 1, device=h.device)
         iters = 0
-        best_state: torch.Tensor | None = None
-        best_score: float = -1.0
+        any_accepted = False
 
         for k in range(self.config.max_iterations):
-            # 1. Generate
+            # 1. Generate -- ALL tokens participate so that done tokens
+            #    still provide self-attention context to active ones.
             h_tilde = self.generator(h, context, key_padding_mask=key_padding_mask)
 
             # 2. Check
@@ -221,38 +241,46 @@ class RSRABlock(nn.Module):
             states.append(h_tilde)
             iters = k + 1
 
-            # 3. Compute acceptance score (active positions only)
-            if key_padding_mask is not None:
-                active_mask = ~key_padding_mask
-                active_mask_3d = active_mask.unsqueeze(-1)
-                active_v = v[active_mask_3d]
-                mean_score = active_v.mean().item() if active_v.numel() > 0 else 0.0
-            else:
-                mean_score = v.mean().item()
+            # 3. Token-level acceptance: find newly converged tokens
+            newly_done = (v >= self.config.tau) & ~done_mask
 
-            # 4. Track best accepted state
-            if mean_score >= self.config.tau:
-                accepted = True
-                if mean_score > best_score:
-                    best_state = h_tilde
-                    best_score = mean_score
-                if not self.training:
-                    # Early exit at inference time
-                    break
+            # Update best state for newly converged tokens
+            if newly_done.any():
+                any_accepted = True
+                # Where newly done, snapshot the current h_tilde as best
+                best_state = torch.where(newly_done, h_tilde, best_state)
+                best_scores_per_token = torch.where(
+                    newly_done, v, best_scores_per_token
+                )
 
-            # 5. Refine for next iteration
+            done_mask = done_mask | newly_done
+
+            # 4. Early exit at inference time when all active tokens are done
+            fraction_done = done_mask.float().mean().item()
+            if fraction_done >= 1.0 and not self.training:
+                break
+
+            # 5. Refine: only update NOT-done tokens.  Frozen tokens
+            #    keep their current state so the generator can still
+            #    attend to them in the next iteration.
             if k < self.config.max_iterations - 1:
-                h = self.refiner(h_tilde, v)
+                h_refined = self.refiner(h_tilde, v)
+                # Frozen tokens keep h (unchanged); active tokens get refined
+                h = torch.where(done_mask, h, h_refined)
 
-        # Return best accepted state, or last generated if never accepted
-        output = best_state if best_state is not None else h_tilde
+        # For tokens that never converged, fall back to the last h_tilde
+        output = (
+            torch.where(done_mask, best_state, h_tilde)
+            if any_accepted
+            else h_tilde
+        )
 
         return RSRABlockOutput(
             output_state=output,
             checker_scores=scores,
             intermediate_states=states,
             iterations_used=iters,
-            accepted=accepted,
+            accepted=any_accepted,
         )
 
     def extra_repr(self) -> str:

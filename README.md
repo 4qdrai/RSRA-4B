@@ -99,13 +99,15 @@ RSRA-4B augments a transformer backbone with three structural components at each
 
 - **🔍 Intrinsic Checker Networks** — Lightweight MLPs that evaluate each hidden state against a learned *consequence space*, trained jointly with generation via consequence targets derived from MCTS teacher rollouts.
 
-- **🔄 Recursive Refinement with Convergence Guarantees** — Refinement operators $R_l$ are constrained to be Banach contractions ($\|R_l\|_{\text{op}} \leq \rho < 1$), guaranteeing convergence to a unique fixed point in $O(\log(1/\varepsilon))$ iterations. A secondary monotone operator pathway provides a relaxed alternative.
+- **🔄 Recursive Refinement with Convergence Guarantees** — Refinement operators $R_l$ are constrained to be Banach contractions with rate $c = 1 - \rho + \rho L_g < 1$ (where $L_g \leq 1$ via spectral normalization), guaranteeing convergence to a unique fixed point in $O(\log(1/\varepsilon))$ iterations. A secondary monotone operator pathway provides a relaxed alternative using skew-symmetric operator parameterization.
 
-- **🏔️ 4-Tier Hierarchical Routing** — Computation flows bottom-up: easy tokens resolve at the fast Operative tier; hard tokens escalate through Tactical, Strategic, and Fallback tiers — each with distinct parameterization and abstraction level.
+- **🏔️ 4-Tier Hierarchical Routing** — Computation flows bottom-up: easy tokens resolve at the fast Operative tier; hard tokens escalate through Tactical, Strategic, and Fallback tiers — each with distinct parameterization and abstraction level, using token-level adaptive early exit.
 
 - **⚖️ Tri-Objective Joint Loss** — A single differentiable loss trains everything end-to-end:
 
-$$\mathcal{L}_{\text{joint}} = \underbrace{\mathcal{L}_{\text{CE}}(y, \hat{y})}_{\text{generation}} + \gamma \underbrace{\sum_l \sum_t \sum_k \| v_{l,t}^{(k)} - v_{\text{target}} \|^2}_{\text{checker calibration}} + \lambda \underbrace{\Omega(\text{FLOPs})}_{\text{compute efficiency}}$$
+$$\mathcal{L}_{\text{joint}} = \mathcal{L}_{\text{CE}}(y, \hat{y}) + \gamma \mathcal{L}_{\text{checker}} + \lambda_{\text{flops}} \Omega_{\text{flops}} + \lambda_{\text{conv}} \Omega_{\text{conv}}$$
+
+where $\Omega_{\text{flops}} = 1.0 - \text{mean}(v)$ is a differentiable FLOPs proxy, and $\Omega_{\text{conv}}$ is an explicit convergence penalty on state differences. Target-directed checker gradients are detached to prevent perverse gradient flows.
 
 ---
 

@@ -101,14 +101,18 @@ class TestMonotoneMode:
     ) -> None:
         assert monotone_refiner.monotone is not None
 
-    def test_effective_weight_is_psd(
+    def test_effective_weight_is_skew_symmetric(
         self, monotone_refiner: RefinementOperator
     ) -> None:
-        """(W^T W + ε I) must have all non-negative eigenvalues."""
+        """W - W^T + eps*I should be anti-symmetric (plus diagonal).
+        The skew part (W - W^T) has zero diagonal and opposite off-diagonal."""
         w = monotone_refiner.monotone.effective_weight()
-        eigvals = torch.linalg.eigvalsh(w)
-        assert (eigvals >= -1e-6).all(), (
-            f"Negative eigenvalue found: {eigvals.min().item()}"
+        # The skew part (W - epsilon*I) should be anti-symmetric
+        eps = monotone_refiner.monotone.epsilon
+        w_skew = w - eps * torch.eye(w.size(0), device=w.device, dtype=w.dtype)
+        diff = (w_skew + w_skew.t()).abs().max()
+        assert diff < 1e-5, (
+            f"Skew part is not anti-symmetric, max deviation: {diff.item()}"
         )
 
     def test_output_shape(
@@ -132,12 +136,15 @@ class TestDualMode:
         assert hasattr(dual_refiner.fc1, "parametrizations")
         assert dual_refiner.monotone is not None
 
-    def test_psd_in_dual(
+    def test_skew_symmetric_in_dual(
         self, dual_refiner: RefinementOperator
     ) -> None:
+        """In DUAL mode, monotone layer should still be skew-symmetric."""
         w = dual_refiner.monotone.effective_weight()
-        eigvals = torch.linalg.eigvalsh(w)
-        assert (eigvals >= -1e-6).all()
+        eps = dual_refiner.monotone.epsilon
+        w_skew = w - eps * torch.eye(w.size(0), device=w.device, dtype=w.dtype)
+        diff = (w_skew + w_skew.t()).abs().max()
+        assert diff < 1e-5
 
     def test_spectral_norm_in_dual(
         self, dual_refiner: RefinementOperator
@@ -243,8 +250,15 @@ class TestGradientFlow:
         loss.backward()
 
         assert h.grad is not None
-        assert v.grad is not None
-        assert v_input.grad is not None
+        # Fix A: v is now detached inside the refiner, so v.grad
+        # should be None (no gradient flows through the checker score
+        # in the refinement path -- this is intentional).
+        assert v.grad is None, (
+            "v should have no grad -- Fix A detaches it in the refiner"
+        )
+        # But the upstream input v_input should still have grad via h
+        # only if h depends on v_input, which it doesn't here.
+        # The key point: gradients flow through h, not through v.
 
     def test_param_gradients_banach(
         self, banach_refiner: RefinementOperator
@@ -304,8 +318,12 @@ class TestMonotoneLinear:
         x = torch.randn(2, 5, 16)
         assert ml(x).shape == (2, 5, 16)
 
-    def test_effective_weight_symmetric(self) -> None:
+    def test_effective_weight_anti_symmetric(self) -> None:
+        """Skew-symmetric: W_skew = W - W^T should satisfy W_skew = -W_skew^T."""
         ml = _MonotoneLinear(16, 16)
         w = ml.effective_weight()
-        diff = (w - w.t()).abs().max()
-        assert diff < 1e-5, "Effective weight is not symmetric"
+        # Remove the epsilon*I diagonal to get the pure skew part
+        eps = ml.epsilon
+        w_skew = w - eps * torch.eye(w.size(0), device=w.device, dtype=w.dtype)
+        diff = (w_skew + w_skew.t()).abs().max()
+        assert diff < 1e-5, f"Effective weight skew part is not anti-symmetric (max diff={diff.item()})"
