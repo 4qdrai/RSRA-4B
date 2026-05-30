@@ -144,8 +144,8 @@ class _Tier(nn.Module):
             h_tilde = self.generator(h)
             v = self.checker(h_tilde)
 
-            # Check per-sample pass: use *mean* confidence
-            if v.mean().item() >= self.cfg.tau_threshold:
+            # Check per-sample pass: use *min* confidence
+            if v.min().item() >= self.cfg.tau_threshold:
                 return h_tilde, v, k + 1
 
             # Refine and loop
@@ -238,7 +238,7 @@ class HierarchicalRouter(nn.Module):
 
             # Accepted?
             if (
-                score.mean().item()
+                score.min().item()
                 >= self.config.tiers[level].tau_threshold
             ):
                 return {

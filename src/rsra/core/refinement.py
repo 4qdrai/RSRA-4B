@@ -156,6 +156,15 @@ class RefinementOperator(nn.Module):
         dropout: float = 0.0,
     ) -> None:
         super().__init__()
+        if constraint in (ConstraintMode.MONOTONE, ConstraintMode.DUAL):
+            import warnings
+            warnings.warn(
+                "MONOTONE and DUAL constraint modes are deprecated experimental implementations. "
+                "For formal convergence guarantees and optimal pre-training stability, "
+                "please use BANACH mode.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
         if not 0.0 < contraction_factor < 1.0:
             raise ValueError(
                 f"contraction_factor must be in (0, 1), "

@@ -145,6 +145,7 @@ def train_one_epoch_variable_iters(
         w_convergence=0.5,
         w_consistency=0.3,
         w_correctness=0.2,
+        tau=config.rsra_tau,
     )
 
     for token_ids, labels, _ in loader:

@@ -89,12 +89,14 @@ class JointLossClassification(nn.Module):
         w_convergence: float = 0.5,
         w_consistency: float = 0.3,
         w_correctness: float = 0.2,
+        tau: float = 0.8,
     ) -> None:
         super().__init__()
         self.gamma = gamma
         self.lambda_flops = lambda_flops
         self.lambda_conv = lambda_conv
         self.convergence_temp = convergence_temp
+        self.tau = tau
 
         # Normalize blend weights to sum to 1
         total = w_convergence + w_consistency + w_correctness
@@ -160,8 +162,12 @@ class JointLossClassification(nn.Module):
             # --- Signal A: Convergence (detached) ---
             # target_k = exp(-||h_k - h_{k-1}||^2 / (d_model * temp))
             # Iteration 0 has no previous state -> target = 0 (not converged)
+            # Track which tokens converged in previous steps to prevent the "frozen context" illusion
+            done_mask = torch.zeros(stacked_scores.size(1), stacked_scores.size(2), 1, dtype=torch.bool, device=device)
+            
             conv_targets = []
             for k in range(K):
+                v = checker_scores[k]
                 if k == 0:
                     # First iteration: no reference -> low confidence
                     conv_targets.append(
@@ -176,7 +182,14 @@ class JointLossClassification(nn.Module):
                     dist_sq = (diff * diff).sum(dim=-1, keepdim=True) / d_model
                     # Smooth target in [0, 1]
                     conv_target = torch.exp(-dist_sq / self.convergence_temp).detach()
+                    
+                    # Override to 1.0 if already done
+                    conv_target = torch.where(done_mask, torch.ones_like(conv_target), conv_target)
                     conv_targets.append(conv_target)
+
+                # Update done_mask for the NEXT step using current score v (detached)
+                newly_done = (v.detach() >= self.tau) & ~done_mask
+                done_mask = done_mask | newly_done
 
             conv_targets = torch.stack(conv_targets, dim=0)  # (K, B, S, 1)
 
@@ -184,11 +197,22 @@ class JointLossClassification(nn.Module):
             # Penalize large distances between consecutive states
             if K > 1:
                 all_dists = []
+                # Reconstruct step-by-step done_mask to mask out already converged tokens
+                done_mask = torch.zeros(stacked_scores.size(1), stacked_scores.size(2), 1, dtype=torch.bool, device=device)
                 for k in range(1, K):
+                    newly_done = (checker_scores[k - 1].detach() >= self.tau) & ~done_mask
+                    done_mask = done_mask | newly_done
+                    
                     diff = intermediate_states[k] - intermediate_states[k - 1]
                     d_model = intermediate_states[k].size(-1)
                     dist_sq = (diff * diff).sum(dim=-1, keepdim=True) / d_model
-                    all_dists.append(dist_sq)
+                    
+                    # Only penalize convergence for tokens that are STILL active
+                    active_mask = ~done_mask
+                    
+                    # Mask and average
+                    masked_dist = (dist_sq * active_mask.float()).sum() / max(1, active_mask.sum().item())
+                    all_dists.append(masked_dist)
                 convergence_penalty = torch.stack(all_dists).mean()
             else:
                 convergence_penalty = torch.tensor(0.0, device=device)

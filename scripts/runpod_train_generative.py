@@ -94,12 +94,16 @@ class GenerativeJointLoss(nn.Module):
         lambda_flops: float = 0.01,
         lambda_conv: float = 0.1,
         convergence_temp: float = 0.1,
+        tau: float = 0.8,
+        pad_id: int = 0,
     ) -> None:
         super().__init__()
         self.gamma = gamma
         self.lambda_flops = lambda_flops
         self.lambda_conv = lambda_conv
         self.convergence_temp = convergence_temp
+        self.tau = tau
+        self.pad_id = pad_id
 
     def forward(
         self,
@@ -107,14 +111,20 @@ class GenerativeJointLoss(nn.Module):
         checker_scores: list[torch.Tensor],
         intermediate_states: list[torch.Tensor],
         labels: torch.Tensor,
+        input_ids: torch.Tensor | None = None,
     ) -> dict[str, torch.Tensor]:
         """Compute combined loss with explicit convergence and differentiable FLOPs."""
         device = ce_loss.device
         K = len(checker_scores)
+        B, S = labels.shape
 
-        # Padding/Label mask: we only penalize checker errors on active target positions
-        # labels is (B, S), where targets are >= 0 and prompt/padding is -100
-        active_mask = (labels != -100).unsqueeze(-1)  # (B, S, 1)
+        # Active mask: to prevent prompt blindness, we supervise the checker across the entire 
+        # non-padded prompt context. We only mask out padding tokens.
+        if input_ids is not None:
+            active_mask = (input_ids != self.pad_id).unsqueeze(-1)  # (B, S, 1) -- includes prompt!
+        else:
+            # Fallback when input_ids is not provided (e.g. backward compatible tests)
+            active_mask = (labels != -100).unsqueeze(-1)  # (B, S, 1)
 
         if K == 0:
             checker_loss = torch.tensor(0.0, device=device)
@@ -122,6 +132,9 @@ class GenerativeJointLoss(nn.Module):
             convergence_penalty = torch.tensor(0.0, device=device)
         else:
             # --- 1. Checker Loss (MSE against convergence targets) ---
+            # Track which tokens converged in previous steps to prevent the "frozen context" illusion
+            done_mask = torch.zeros(B, S, 1, dtype=torch.bool, device=device)
+            
             mse_losses = []
             for k in range(K):
                 v = checker_scores[k]  # (B, S, 1)
@@ -132,8 +145,15 @@ class GenerativeJointLoss(nn.Module):
                     d_model = intermediate_states[k].size(-1)
                     dist_sq = (diff * diff).sum(dim=-1, keepdim=True) / d_model
                     target = torch.exp(-dist_sq / self.convergence_temp).detach()
+                    
+                    # If a token was flagged as converged in previous steps, hardcode its target to 1.0
+                    target = torch.where(done_mask, torch.ones_like(target), target)
 
-                # Only supervise checker on actual target generation tokens
+                # Update done_mask for the NEXT step using CURRENT checker score v (detached)
+                newly_done = (v.detach() >= self.tau) & ~done_mask
+                done_mask = done_mask | newly_done
+
+                # Only supervise checker on non-padded positions
                 mse = F_mse(v, target, active_mask)
                 mse_losses.append(mse)
             checker_loss = torch.stack(mse_losses).mean()
@@ -141,12 +161,21 @@ class GenerativeJointLoss(nn.Module):
             # --- 2. Explicit Convergence Penalty ---
             if K > 1:
                 all_dists = []
+                # Reconstruct step-by-step done_mask to mask out already converged tokens
+                done_mask = torch.zeros(B, S, 1, dtype=torch.bool, device=device)
                 for k in range(1, K):
+                    newly_done = (checker_scores[k - 1].detach() >= self.tau) & ~done_mask
+                    done_mask = done_mask | newly_done
+                    
                     diff = intermediate_states[k] - intermediate_states[k - 1]
                     d_model = intermediate_states[k].size(-1)
                     dist_sq = (diff * diff).sum(dim=-1, keepdim=True) / d_model
+                    
+                    # Only penalize convergence for tokens that are STILL active (active & not done)
+                    combined_mask = active_mask & ~done_mask
+                    
                     # Mask and average
-                    masked_dist = (dist_sq * active_mask.float()).sum() / max(1, active_mask.sum().item())
+                    masked_dist = (dist_sq * combined_mask.float()).sum() / max(1, combined_mask.sum().item())
                     all_dists.append(masked_dist)
                 convergence_penalty = torch.stack(all_dists).mean()
             else:
@@ -288,12 +317,13 @@ def train_generative_epoch_rsra(
     sum_ce = 0.0
     sum_checker = 0.0
     sum_flops = 0.0
-    
     criterion = GenerativeJointLoss(
         gamma=1.0,
         lambda_flops=0.01,
         lambda_conv=0.1,
         convergence_temp=0.1,
+        tau=config.rsra_tau,
+        pad_id=model.pad_id,
     )
 
     for combined_ids, labels, _ in loader:
@@ -311,6 +341,7 @@ def train_generative_epoch_rsra(
             checker_scores=scores,
             intermediate_states=states,
             labels=labels,
+            input_ids=combined_ids,
         )
         loss = loss_dict["total_loss"]
 
