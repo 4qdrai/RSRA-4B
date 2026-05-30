@@ -393,6 +393,59 @@ def train_generative_epoch_baseline(
     return total_loss / max(1, n_batches)
 
 
+def push_results_to_github(results_dir: str, task_type: str) -> None:
+    """Auto-commits and pushes training results back to GitHub."""
+    import subprocess
+    print("\n[AUTO-PUSH] Pushing generative pre-training results to GitHub...", flush=True)
+    try:
+        root = str(PROJECT_ROOT)
+        
+        # Configure git (RunPod instances won't have local user configs)
+        subprocess.run(["git", "config", "user.email", "runpod@rsra-4b.ai"], cwd=root, check=True)
+        subprocess.run(["git", "config", "user.name", "RunPod H100 Generative Benchmark"], cwd=root, check=True)
+
+        # Stage results file and figures
+        results_json = os.path.join(results_dir, "generative_results.json")
+        subprocess.run(["git", "add", results_json], cwd=root, check=True)
+        subprocess.run(["git", "add", "figures/"], cwd=root, check=False)
+
+        # Commit
+        gpu_name = "H100"
+        try:
+            import torch
+            if torch.cuda.is_available():
+                gpu_name = torch.cuda.get_device_name(0)
+        except Exception:
+            pass
+
+        commit_msg = f"[RunPod] Generative pre-training - {task_type.upper()} task ({gpu_name})"
+        result = subprocess.run(
+            ["git", "commit", "-m", commit_msg],
+            cwd=root, capture_output=True, text=True,
+        )
+
+        if result.returncode != 0:
+            if "nothing to commit" in result.stdout:
+                print("  No changes to commit.", flush=True)
+                return
+            print(f"  Git commit warning: {result.stderr}", flush=True)
+
+        # Push
+        result = subprocess.run(
+            ["git", "push", "origin", "main"],
+            cwd=root, capture_output=True, text=True, timeout=60,
+        )
+
+        if result.returncode == 0:
+            print("  ✅ Results successfully pushed to GitHub!", flush=True)
+            print("  You can now see results at: https://github.com/4qdrai/RSRA-4B", flush=True)
+        else:
+            print(f"  ⚠️  Push failed: {result.stderr.strip()}", flush=True)
+
+    except Exception as e:
+        print(f"  ⚠️  Auto-push failed: {e}. Results saved locally.", flush=True)
+
+
 # ======================================================================
 # Main Curriculum Pre-Training Sweep
 # ======================================================================
@@ -685,6 +738,9 @@ def run_generative_benchmark():
         
     print("\nPre-training Sweep Completed Successfully!")
     print(f"Results and model weights (.pt checkpoints) dumped in {config.results_dir}")
+
+    # Auto-commit and push results to GitHub
+    push_results_to_github(config.results_dir, args.task_type)
 
 
 if __name__ == "__main__":
