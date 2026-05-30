@@ -311,6 +311,7 @@ def train_generative_epoch_rsra(
     optimizer: torch.optim.Optimizer,
     device: torch.device,
     config: GenerativeH100Config,
+    n_max: int,
 ) -> tuple[float, float, dict[str, float]]:
     """Train RSRA causally with variable iterations and generative joint loss."""
     model.train()
@@ -335,7 +336,11 @@ def train_generative_epoch_rsra(
         labels = labels.to(device)
 
         if config.rsra_train_max_iters > 0:
-            k = random.randint(2, config.rsra_train_max_iters)
+            # Ensure the model always unrolls for enough recurrent iterations to physically
+            # trace the maximum chain length in the current curriculum phase.
+            min_k = max(3, n_max + 1)
+            max_k = max(min_k + 2, config.rsra_train_max_iters)
+            k = random.randint(min_k, max_k)
             model.rsra_block.config.max_iterations = k
 
         logits, ce_loss, iters, scores, states = model(combined_ids, labels=labels)
@@ -666,7 +671,7 @@ def run_generative_benchmark():
             
             # --- 2. Train RSRA ---
             loss_rsra, iters_rsra, loss_comp = train_generative_epoch_rsra(
-                rsra, train_loader, optimizer_rsra, device, config
+                rsra, train_loader, optimizer_rsra, device, config, phase["n_range"][1]
             )
             
             # --- 3. Periodic Evaluation ---
