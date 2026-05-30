@@ -492,18 +492,26 @@ def run_generative_benchmark():
     epochs_mult = args.epochs_multiplier
     data_mult = args.data_multiplier
     if args.large:
-        # Progressive curriculum scaled by epochs_multiplier!
-        # Allows easy scaling for larger models (which need more epochs to converge).
-        # Later, harder phases are allocated progressively MORE epochs to guarantee convergence!
-        phase1_epochs = int(10 * epochs_mult)
-        phase2_epochs = int(20 * epochs_mult)
-        phase3_epochs = int(30 * epochs_mult)
+        # High-Capacity full pre-training curriculum (guarantees model convergence)
         data_mult = 5.0
+        if args.task_type == "complex":
+            phase1_epochs = int(25 * epochs_mult)
+            phase2_epochs = int(56 * epochs_mult)
+            phase3_epochs = int(100 * epochs_mult)
+        else:
+            phase1_epochs = int(80 * epochs_mult)
+            phase2_epochs = int(120 * epochs_mult)
+            phase3_epochs = int(160 * epochs_mult)
     else:
-        # Standard progressive curriculum
-        phase1_epochs = int(8 * epochs_mult)
-        phase2_epochs = int(12 * epochs_mult)
-        phase3_epochs = int(16 * epochs_mult)
+        # Quick benchmark sweeps
+        if args.task_type == "complex":
+            phase1_epochs = int(10 * epochs_mult)
+            phase2_epochs = int(15 * epochs_mult)
+            phase3_epochs = int(20 * epochs_mult)
+        else:
+            phase1_epochs = int(8 * epochs_mult)
+            phase2_epochs = int(12 * epochs_mult)
+            phase3_epochs = int(16 * epochs_mult)
         
     config.curriculum_phases = [
         {"epochs": phase1_epochs, "n_range": (2, 3), "n_train": int(15000 * data_mult), "n_distractors": 0},

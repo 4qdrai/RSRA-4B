@@ -26,7 +26,7 @@ The sequence tracing routing space is expanded into a highly branched logic maze
 
 Larger models have many more weights and require a larger data regime and more progressive curriculum steps to fully converge without overfitting. We configure this sweep using:
 *   `--large` flag: Allocates a **5$\times$ larger training dataset** (75,000 sequences in Phase 1, 90,000 in Phase 2, 100,000 in Phase 3).
-*   `--epochs_multiplier 1.5`: Progressively scales training epochs across curriculum phases (Phase 1: 12 epochs, Phase 2: 18 epochs, Phase 3: 24 epochs; total of **54 epochs**).
+*   `--epochs_multiplier 1.5`: Progressively scales training epochs across curriculum phases to allow full convergence of high-capacity models (Phase 1: 37 epochs, Phase 2: 84 epochs, Phase 3: 150 epochs; total of **271 epochs**).
 
 ---
 
