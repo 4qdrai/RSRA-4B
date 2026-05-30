@@ -16,7 +16,7 @@ We expand the representation width and attention heads to allow the networks to 
 
 ### B. The Hardest Logical Problem (Complex Task + Scaling)
 The sequence tracing routing space is expanded into a highly branched logic maze:
-1.  **Recursive Decoy Trees (Branching Factor = 3, Depth = 3):** For every active logical variable on the path, the dataset constructs a tree of decoy variable implication rules of depth 3 branching three ways. The model must recursively filter out **39 active decoy paths** per step to locate the true target.
+1.  **Recursive Decoy Trees (Branching Factor = 2, Depth = 2):** For every active logical variable on the path, the dataset constructs a tree of decoy variable implication rules of depth 2 branching two ways. This introduces multiple active decoy paths to filter.
 2.  **Cyclical Loop Traps (Length $\ge 3$):** Variable chains are deliberately looped to test whether standard transformers get trapped in endless cycles, and whether RSRA can use its Banach contraction checker to escape.
 3.  **Active Distractor Rules (Phase 3):** Random noise implication rules are shuffled into the sequence to test noise robust filtering.
 
@@ -72,9 +72,9 @@ python scripts/runpod_train_generative.py \
     --d_ff 1536 \
     --large \
     --epochs_multiplier 1.5 \
-    --branching_factor 3 \
-    --decoy_depth 3 \
-    --num_cycles 3 \
+    --branching_factor 2 \
+    --decoy_depth 2 \
+    --num_cycles 2 \
     --results_dir results/generative_benchmark_complex_h100
 ```
 
