@@ -72,7 +72,7 @@ class GenerativeH100Config:
         {"epochs": 8, "n_range": (2, 6), "n_train": 20000, "n_distractors": 2},
     ])
 
-    batch_size: int = 256
+    batch_size: int = 64
     lr: float = 5e-4
     weight_decay: float = 0.01
     warmup_epochs: int = 2
@@ -240,61 +240,74 @@ def evaluate_greedy_accuracy(
         labels = labels.to(device)
         B, S = combined_ids.shape
 
-        # 1. Truncate each sequence in the batch at the <PATH> token to form the prompt
         prompts = []
         target_sequences = []
         for b in range(B):
             seq = combined_ids[b].tolist()
             lbl = labels[b].tolist()
             
-            # Find index of <PATH> token
             try:
                 path_idx = seq.index(tokenizer.path_id)
                 prompt_ids = seq[:path_idx + 1]
             except ValueError:
                 prompt_ids = seq[:S // 2]
                 
-            # Ground truth targets (tokens we expect the model to generate)
             targets = [x for x in lbl if x != -100]
-            
             prompts.append(prompt_ids)
             target_sequences.append(targets)
 
-        # 2. Dynamic generation loop per prompt in batch
-        # For simple and clean batch generation, we process each batch item
+        # 2. Vectorized Batched Generation
+        prompt_lens = torch.tensor([len(p) for p in prompts], dtype=torch.long, device=device)
+        max_prompt_len = prompt_lens.max().item()
+        
+        batch_seqs = torch.full((B, max_prompt_len), tokenizer.pad_id, dtype=torch.long, device=device)
         for b in range(B):
-            prompt = torch.tensor(prompts[b], dtype=torch.long, device=device).unsqueeze(0)
-            target = target_sequences[b]
-            generated = []
+            batch_seqs[b, :len(prompts[b])] = torch.tensor(prompts[b], dtype=torch.long, device=device)
             
-            # Max tokens to generate
-            max_gen = len(target) + 4
+        active_mask = torch.ones(B, dtype=torch.bool, device=device)
+        generated = [[] for _ in range(B)]
+        max_gen = max((len(t) for t in target_sequences), default=0) + 4
+        
+        for _ in range(max_gen):
+            if not active_mask.any():
+                break
+                
+            max_len = model.max_seq_len if is_rsra else model.config.max_seq_len
             
-            for _ in range(max_gen):
-                # Ensure sequence length does not exceed max_seq_len of the model to avoid pos_embedding overflow
-                max_len = model.max_seq_len if is_rsra else model.config.max_seq_len
-                model_input = prompt[:, -max_len:] if prompt.size(1) > max_len else prompt
+            # For right-padded sequences, truncation from the left is dangerous if sequences have varying lengths.
+            # However, for this benchmark, max_prompt_len + max_gen < max_len (typically < 100 < 512).
+            # So we pass the entire batch_seqs.
+            if batch_seqs.size(1) > max_len:
+                # Fallback safety (though shouldn't be hit): only keep last max_len
+                model_input = batch_seqs[:, -max_len:]
+                # Adjust indices for the slice
+                seq_indices = torch.clamp(prompt_lens - 1 - (batch_seqs.size(1) - max_len), min=0)
+            else:
+                model_input = batch_seqs
+                seq_indices = prompt_lens - 1
+            
+            if is_rsra:
+                logits, _, _, _, _ = model(model_input)
+            else:
+                logits, _ = model(model_input)
                 
-                # Run forward pass on generated prompt prefix
-                if is_rsra:
-                    logits, _, _, _, _ = model(model_input)
-                else:
-                    logits, _ = model(model_input)
-                
-                # Get prediction for last position
-                next_token_logits = logits[0, -1, :]
-                next_token = torch.argmax(next_token_logits).item()
-                
-                generated.append(next_token)
-                if next_token == tokenizer.eos_id:
-                    break
-                    
-                # Append predicted token to sequence
-                new_token_tensor = torch.tensor([[next_token]], dtype=torch.long, device=device)
-                prompt = torch.cat([prompt, new_token_tensor], dim=-1)
+            next_token_logits = logits[torch.arange(B), seq_indices, :]
+            next_tokens = torch.argmax(next_token_logits, dim=-1)
+            
+            batch_seqs = torch.cat([batch_seqs, torch.full((B, 1), tokenizer.pad_id, dtype=torch.long, device=device)], dim=1)
+            batch_seqs[torch.arange(B), prompt_lens] = next_tokens
+            
+            for b in range(B):
+                if active_mask[b]:
+                    tok = next_tokens[b].item()
+                    generated[b].append(tok)
+                    if tok == tokenizer.eos_id:
+                        active_mask[b] = False
+                        
+            prompt_lens = prompt_lens + 1
 
-            # 3. Check for exact match
-            if generated == target:
+        for b in range(B):
+            if generated[b] == target_sequences[b]:
                 correct_paths += 1
             total_paths += 1
 
@@ -469,7 +482,7 @@ def run_generative_benchmark():
     parser.add_argument("--n_heads", type=int, default=4, help="Number of attention heads")
     parser.add_argument("--d_ff", type=int, default=512, help="Feedforward dimension size")
     parser.add_argument("--lr", type=float, default=5e-4, help="Learning rate")
-    parser.add_argument("--batch_size", type=int, default=256, help="Batch size")
+    parser.add_argument("--batch_size", type=int, default=64, help="Batch size")
     parser.add_argument("--baseline_n_layers", type=int, default=1, help="Number of layers in the Baseline Transformer")
     parser.add_argument("--rsra_train_max_iters", type=int, default=16, help="Max iterations during training")
     parser.add_argument("--rsra_eval_max_iters", type=int, default=30, help="Max iterations during evaluation")
