@@ -723,6 +723,19 @@ def run_generative_benchmark():
             
             global_epoch += 1
 
+            # --- 4. Dynamic Curriculum Convergence Escalation (Early Phase Stopping) ---
+            # If the model has perfectly converged (98%+ SFT accuracy) on the current reasoning depth,
+            # we escalate to the next curriculum phase immediately to save GPU compute and prevent overfitting.
+            if rsra_acc >= 0.98 and epoch >= 2:
+                print(f"\n[CONVERGENCE] RSRA SFT Accuracy reached {rsra_acc:5.1%} >= 98.0%!")
+                print(f"  Curriculum Phase {phase_idx+1} fully converged at epoch {epoch}/{phase['epochs']}.")
+                print(f"  Escalating early to curriculum Phase {phase_idx+2 if phase_idx+2 <= 3 else 3} to save H100 GPU compute!\n")
+                
+                # Fast-forward global epoch to maintain scheduler decay synchronization
+                remaining_epochs_in_phase = phase["epochs"] - (epoch + 1)
+                global_epoch += remaining_epochs_in_phase
+                break
+
         # Save curriculum phase checkpoints
         torch.save(rsra.state_dict(), os.path.join(config.results_dir, f"rsra_phase_{phase_idx+1}.pt"))
         torch.save(baseline.state_dict(), os.path.join(config.results_dir, f"baseline_phase_{phase_idx+1}.pt"))

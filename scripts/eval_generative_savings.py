@@ -126,7 +126,7 @@ def run_evaluation():
         print(f"TASK: {task.upper()}")
         print("-" * 80)
         
-        results_dir = f"results/generative_benchmark_{task}"
+        results_dir = f"results/generative_benchmark_{task}_clean" if task == "standard" else f"results/generative_benchmark_{task}"
         if not os.path.exists(results_dir):
             print(f"Results directory not found: {results_dir}")
             continue
