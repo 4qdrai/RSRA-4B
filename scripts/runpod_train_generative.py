@@ -490,14 +490,16 @@ def run_generative_benchmark():
     if args.large:
         # Progressive curriculum scaled by epochs_multiplier!
         # Allows easy scaling for larger models (which need more epochs to converge).
+        # Later, harder phases are allocated progressively MORE epochs to guarantee convergence!
         phase1_epochs = int(10 * epochs_mult)
-        phase2_epochs = int(22.5 * epochs_mult)  # Reduced by 25% (30 -> 22.5)
-        phase3_epochs = int(40 * epochs_mult)    # Reduced by 50% (80 -> 40)
+        phase2_epochs = int(20 * epochs_mult)
+        phase3_epochs = int(30 * epochs_mult)
         data_mult = 5.0
     else:
+        # Standard progressive curriculum
         phase1_epochs = int(8 * epochs_mult)
-        phase2_epochs = int(6 * epochs_mult)     # Reduced by 25% (8 -> 6)
-        phase3_epochs = int(4 * epochs_mult)     # Reduced by 50% (8 -> 4)
+        phase2_epochs = int(12 * epochs_mult)
+        phase3_epochs = int(16 * epochs_mult)
         
     config.curriculum_phases = [
         {"epochs": phase1_epochs, "n_range": (2, 3), "n_train": int(15000 * data_mult), "n_distractors": 0},
@@ -722,19 +724,6 @@ def run_generative_benchmark():
             })
             
             global_epoch += 1
-
-            # --- 4. Dynamic Curriculum Convergence Escalation (Early Phase Stopping) ---
-            # If the model has perfectly converged (98%+ SFT accuracy) on the current reasoning depth,
-            # we escalate to the next curriculum phase immediately to save GPU compute and prevent overfitting.
-            if rsra_acc >= 0.98 and epoch >= 2:
-                print(f"\n[CONVERGENCE] RSRA SFT Accuracy reached {rsra_acc:5.1%} >= 98.0%!")
-                print(f"  Curriculum Phase {phase_idx+1} fully converged at epoch {epoch}/{phase['epochs']}.")
-                print(f"  Escalating early to curriculum Phase {phase_idx+2 if phase_idx+2 <= 3 else 3} to save H100 GPU compute!\n")
-                
-                # Fast-forward global epoch to maintain scheduler decay synchronization
-                remaining_epochs_in_phase = phase["epochs"] - (epoch + 1)
-                global_epoch += remaining_epochs_in_phase
-                break
 
         # Save curriculum phase checkpoints
         torch.save(rsra.state_dict(), os.path.join(config.results_dir, f"rsra_phase_{phase_idx+1}.pt"))
