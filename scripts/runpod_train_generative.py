@@ -486,7 +486,7 @@ def run_generative_benchmark():
     config.results_dir = args.results_dir
     
     if args.task_type == "complex":
-        config.max_seq_len = 256  # Scale context to fit branching logic rules
+        config.max_seq_len = 512  # Comfortably fit branching logic rules and prevent truncation!
         config.max_vars = 60      # Expand variable pool to prevent collisions
     
     epochs_mult = args.epochs_multiplier
