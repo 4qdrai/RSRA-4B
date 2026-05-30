@@ -276,3 +276,48 @@ class TestRepr:
         r = repr(block)
         assert "d_model=32" in r
         assert "tau=0.5" in r
+
+
+# ======================================================================
+# Causal early exit
+# ======================================================================
+
+class TestCausalEarlyExit:
+    """Verify that causal attention mask optimizes early exit at inference time."""
+
+    def test_causal_early_exit(self) -> None:
+        cfg = RSRABlockConfig(
+            d_model=D_MODEL,
+            n_heads=N_HEADS,
+            d_ff=D_FF,
+            tau=0.5,
+            max_iterations=5,
+            min_iterations=1,
+        )
+        blk = RSRABlock(cfg)
+        blk.eval()
+
+        h = torch.randn(BATCH, SEQ_LEN, D_MODEL)
+        
+        # Build causal attention mask (True = ignore in attention)
+        causal_mask = torch.triu(
+            torch.ones((SEQ_LEN, SEQ_LEN), dtype=torch.bool), diagonal=1
+        )
+
+        # Mock checker to return high score (1.0) only at the last position, and 0.0 elsewhere.
+        # This simulates a situation where only the target token being generated has converged.
+        def mock_forward(x):
+            v = torch.zeros(x.size(0), x.size(1), 1, device=x.device)
+            v[:, -1, :] = 1.0  # only last token is done
+            return v
+        blk.checker.forward = mock_forward
+
+        # 1. Non-causal forward pass (attn_mask=None)
+        # Since not all sequence positions are done, it must run all 5 iterations.
+        out_non_causal = blk(h)
+        assert out_non_causal.iterations_used == 5
+
+        # 2. Causal forward pass (attn_mask is present)
+        # Since it only checks the last position, and the last position is done, it exits after 1 iteration!
+        out_causal = blk(h, attn_mask=causal_mask)
+        assert out_causal.iterations_used == 1

@@ -663,8 +663,11 @@ class RSRAForCSP(nn.Module):
 
         x = self.embedding(token_ids) + self.pos_embedding(positions)
 
+        # Build padding mask for self-attention (True = ignore)
+        pad_mask = (token_ids == self.pad_id)
+
         # Run through RSRA block
-        rsra_out = self.rsra_block(x)
+        rsra_out = self.rsra_block(x, key_padding_mask=pad_mask)
         h = rsra_out.output_state  # (B, S, d_model)
         iters = rsra_out.iterations_used
 

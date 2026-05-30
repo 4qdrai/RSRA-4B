@@ -51,6 +51,7 @@ from rsra.benchmarks.relation_chain_task import (
     RSRAForTRLC,
 )
 from rsra.core.rsra_block import RSRABlock, RSRABlockConfig
+from rsra.core.joint_loss_classification import JointLossClassification
 
 
 # ======================================================================
@@ -122,24 +123,22 @@ def train_one_epoch(
         optimizer.zero_grad()
 
         if is_rsra:
-            preds, _, scores, _ = model(tokens)
-            classification_loss = criterion(preds, labels)
-            
-            # Stack checker scores to shape (B, K, S, 1) and expand target label
-            stacked_scores = torch.stack(scores, dim=1)  # (B, K, S, 1)
-            B, K, S, _ = stacked_scores.shape
-            checker_targets = labels.view(B, 1, 1, 1).expand(-1, K, S, 1)
-            
-            # Mask padding positions so the checker only learns on active rule/query tokens
-            pad_id = model.pad_id if hasattr(model, 'pad_id') else 0
-            active_mask = (tokens != pad_id).float().unsqueeze(1).unsqueeze(-1)  # (B, 1, S, 1)
-            active_mask = active_mask.expand(-1, K, -1, -1)
-            
-            # Compute MSE only on active tokens
-            checker_loss = torch.sum(((stacked_scores - checker_targets) ** 2) * active_mask) / active_mask.sum().clamp(min=1.0)
-            
-            # Joint Loss: Optimize both classification and latent verification
-            loss = classification_loss + 0.5 * checker_loss
+            preds, iters, scores, states = model(tokens)
+            joint_loss_fn = JointLossClassification(
+                gamma=1.0,
+                lambda_flops=0.01,
+                lambda_conv=0.1,
+                tau=model.rsra_block.config.tau
+            )
+            loss_dict = joint_loss_fn(
+                logits=preds,
+                targets=labels,
+                checker_scores=scores,
+                intermediate_states=states,
+                iterations_used=iters,
+                max_iterations=model.rsra_block.config.max_iterations,
+            )
+            loss = loss_dict["total_loss"]
         else:
             preds = model(tokens)
             loss = criterion(preds, labels)

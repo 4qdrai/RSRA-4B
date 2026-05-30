@@ -210,7 +210,9 @@ class RefinementOperator(nn.Module):
         else:
             self.monotone = None  # type: ignore[assignment]
 
-        self.act = nn.GELU()
+        # Use LeakyReLU to strictly bound Lipschitz constant of the activation by 1.0.
+        # GELU has a Lipschitz constant of ~1.13, which violates the contraction proof.
+        self.act = nn.LeakyReLU(negative_slope=0.1)
         self.drop = nn.Dropout(dropout)
 
     # ------------------------------------------------------------------

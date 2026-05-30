@@ -266,9 +266,15 @@ class RSRABlock(nn.Module):
             # 4. Early exit at inference time when all active tokens are done.
             # We enforce a minimum iteration threshold (e.g. 3 thinking steps) to prevent
             # premature exit before reasoning has physically propagated through the loops.
-            fraction_done = done_mask.float().mean().item()
-            if fraction_done >= 1.0 and not self.training and k >= (self.config.min_iterations - 1):
-                break
+            if not self.training and k >= (self.config.min_iterations - 1):
+                # If causal attention mask is present, we only care about the last token converging!
+                if attn_mask is not None and not isinstance(attn_mask, bool):
+                    if done_mask[:, -1].all():
+                        break
+                else:
+                    fraction_done = done_mask.float().mean().item()
+                    if fraction_done >= 1.0:
+                        break
 
             # 5. Refine: only update NOT-done tokens.  Frozen tokens
             #    keep their current state so the generator can still
