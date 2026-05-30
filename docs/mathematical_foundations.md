@@ -172,6 +172,9 @@ The refinement iteration $h_{k+1} = R_l(h_k)$ can be viewed as a forward Euler d
 
 ## Theorem 2: Monotone Operator Convergence
 
+> [!WARNING]
+> **Implementation Status: Deprecated.** The monotone operator pathway described below is a valid theoretical convergence guarantee. However, the current RSRA-4B implementation has **deprecated** the `MONOTONE` and `DUAL` constraint modes in `refinement.py` because the skew-symmetric weight parameterization was appended at the end of a standard MLP rather than integrated inside the implicit fixed-point equation as required by Winston & Kolter (2020). All active configurations use the Banach contraction mapping (Theorem 1) exclusively. This theorem is retained for theoretical completeness and as a potential future direction if the monotone parameterization is corrected.
+
 This theorem provides an alternative convergence guarantee that does not require the strict contraction condition $\rho < 1$, potentially allowing greater model expressivity.
 
 ### Statement
@@ -451,14 +454,15 @@ The four theorems together establish a complete convergence and efficiency lands
     └─────────────────────────────────────────────────┘
 ```
 
-**Key insight:** Theorems 1 and 2 are *complementary*, not competing. The Banach approach is simpler and provides stronger guarantees (uniqueness, exact convergence rate) at the cost of expressivity (strict contraction). The monotone approach is more permissive (no norm constraint below 1) but requires more sophisticated analysis. In practice, we use the Banach approach as the default and offer the monotone parameterization as a drop-in replacement for tiers where spectral norm constraints prove too restrictive.
+**Key insight:** Theorem 1 (Banach contraction) is the sole active convergence guarantee in the current implementation. Theorem 2 (monotone operator) provides a valid theoretical alternative but has been deprecated in the codebase because the skew-symmetric parameterization in `refinement.py` was not correctly integrated inside the implicit layer equation. The monotone approach remains a promising direction for future work if the parameterization is corrected to satisfy the requirements of Winston & Kolter (2020).
 
 **Practical convergence protocol:**
 
-1. Initialize with $\rho = 0.9$ (Banach).
+1. Initialize with $\rho = 0.5$ (Banach).
 2. Monitor actual iteration counts during training.
-3. If mean iterations approach $K_{\max}$, the contraction is too aggressive — switch that tier to monotone parameterization.
-4. If mean iterations are $< 3$, the contraction may be too tight — relax $\rho$ toward $0.95$.
+3. If mean iterations approach $K_{\max}$, relax $\rho$ toward $0.7$ to allow wider exploration.
+4. If mean iterations are $< 3$, the contraction may be too tight — relax $\rho$ toward $0.6$.
+5. Use the `TauScheduler` to ramp the checker threshold from lenient to strict during training.
 
 ---
 

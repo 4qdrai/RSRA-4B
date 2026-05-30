@@ -9,7 +9,7 @@
 <p align="center">
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10%2B-blue?logo=python&logoColor=white" alt="Python 3.10+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-green" alt="License Apache 2.0"></a>
-  <a href="#running-the-test-suite"><img src="https://img.shields.io/badge/tests-170%2B%20passing-brightgreen" alt="Tests 170+ Passing"></a>
+  <a href="#running-the-test-suite"><img src="https://img.shields.io/badge/tests-232%20passing-brightgreen" alt="Tests 232 Passing"></a>
   <a href="https://www.sprind.org/en/challenges/next-frontier-ai/"><img src="https://img.shields.io/badge/SPRIND-Next%20Frontier%20AI%202026-orange?logo=data:image/svg+xml;base64," alt="SPRIND Challenge 2026"></a>
 </p>
 
@@ -24,7 +24,7 @@ Modern large language models generate tokens blindly — each hidden state is co
 | Metric | Value | Significance |
 |--------|-------|-------------|
 | **KV-Cache Scaling** | **O(1) memory with reasoning depth** | Latent recursion generates zero intermediate tokens (see operating-point analysis below) |
-| **Convergence Guarantees** | **Dual:** Banach contraction + monotone operator | Strongest formal guarantees in the field — no competitor offers both |
+| **Convergence Guarantees** | **Banach contraction mapping** (spectral normalization + convex combination) | Geometric convergence to unique fixed point with rate c = 1 - ρ(1 - L_g) < 1 |
 | **Reasoning Preservation** | **>30x improvement** at 100 reasoning steps | Standard: 0.6% accuracy -> RSRA-4B: >19.7% (conservative) to >68% (multi-tier) |
 | **Parameter Efficiency** | **4.75x fewer parameters** | RSRA 4.0M params vs baseline 19.1M params with comparable accuracy on TRLC (H100 benchmark) |
 | **Stage 1 Compute** | **EUR 37,500** (~15K H100-hrs) | 1.25% of EUR 3M budget — frees 98.75% for talent & data |
@@ -99,15 +99,15 @@ RSRA-4B augments a transformer backbone with three structural components at each
 
 - **🔍 Intrinsic Checker Networks** — Lightweight MLPs that evaluate each hidden state against a learned *consequence space*, trained jointly with generation via consequence targets derived from MCTS teacher rollouts.
 
-- **🔄 Recursive Refinement with Convergence Guarantees** — Refinement operators $R_l$ are constrained to be Banach contractions with rate $c = 1 - \rho + \rho L_g < 1$ (where $L_g \leq 1$ via spectral normalization), guaranteeing convergence to a unique fixed point in $O(\log(1/\varepsilon))$ iterations. A secondary monotone operator pathway provides a relaxed alternative using skew-symmetric operator parameterization.
+- **🔄 Recursive Refinement with Convergence Guarantees** — Refinement operators $R_l$ are constrained to be Banach contractions via spectral normalization and convex combination: $R(h) = (1-\rho)h + \rho \cdot g(h)$, yielding contraction rate $c = 1 - \rho + \rho L_g < 1$ (where $L_g \leq 1$ via spectral normalization). This guarantees convergence to a unique fixed point in $O(\log(1/\varepsilon))$ iterations. A legacy monotone operator pathway (skew-symmetric parameterization) exists as a theoretical alternative but is deprecated in the active implementation due to mathematical inconsistencies when appended outside the implicit layer equation.
 
-- **🏔️ 4-Tier Hierarchical Routing** — Computation flows bottom-up: easy tokens resolve at the fast Operative tier; hard tokens escalate through Tactical, Strategic, and Fallback tiers — each with distinct parameterization and abstraction level, using token-level adaptive early exit.
+- **🏔️ 4-Tier Hierarchical Routing** — Computation flows bottom-up: easy tokens resolve at the fast Operative tier; hard tokens escalate through Tactical, Strategic, and Fallback tiers — each with distinct parameterization and abstraction level, using token-level adaptive early exit, with per-sequence min-confidence routing ensuring every active token converges before acceptance.
 
 - **⚖️ Tri-Objective Joint Loss** — A single differentiable loss trains everything end-to-end:
 
 $$\mathcal{L}_{\text{joint}} = \mathcal{L}_{\text{CE}}(y, \hat{y}) + \gamma \mathcal{L}_{\text{checker}} + \lambda_{\text{flops}} \Omega_{\text{flops}} + \lambda_{\text{conv}} \Omega_{\text{conv}}$$
 
-where $\Omega_{\text{flops}} = 1.0 - \text{mean}(v)$ is a differentiable FLOPs proxy, and $\Omega_{\text{conv}}$ is an explicit convergence penalty on state differences. Target-directed checker gradients are detached to prevent perverse gradient flows.
+where $\Omega_{\text{flops}} = 1.0 - \text{mean}(v)$ is a differentiable FLOPs proxy, and $\Omega_{\text{conv}}$ is an explicit convergence penalty on state differences. Target-directed checker gradients are detached to prevent perverse gradient flows. Additionally, a step-by-step done-mask reconstruction protects the checker from self-attention micro-shifts on already-converged tokens, and the checker receives supervision across the full non-padded sequence (prompts + targets) to prevent prompt blindness.
 
 ---
 
@@ -118,7 +118,7 @@ git clone https://github.com/4qdrai/RSRA-4B.git
 cd RSRA-4B
 pip install -e '.[dev]'
 
-# Run the full test suite (170+ tests)
+# Run the full test suite (232 tests)
 python -m pytest tests/ -v
 ```
 
@@ -259,7 +259,7 @@ RSRA-4B/
 │   │   └── compute_scaling.py         ←   FLOPs & budget analysis
 │   └── benchmarks/                    ← Toy task baselines (planned)
 │
-├── tests/                             ← 170+ unit & integration tests
+├── tests/                             ← 232 unit & integration tests
 │   ├── test_checker.py
 │   ├── test_convergence.py
 │   ├── test_generator.py
@@ -286,7 +286,7 @@ RSRA-4B/
 | Document | Description |
 |----------|-------------|
 | 📑 [Scientific Documentation](docs/scientific_documentation.md) | Full research paper: introduction, related work, architecture, experiments, limitations |
-| 📐 [Mathematical Foundations](docs/mathematical_foundations.md) | Formal proofs: Banach contraction, monotone operators, bounded compute, memory scaling |
+| 📐 [Mathematical Foundations](docs/mathematical_foundations.md) | Formal proofs: Banach contraction mapping, bounded compute, memory scaling |
 | 🥊 [Comparison Matrix](docs/comparison_matrix.md) | Head-to-head differentiation from 9 competing approaches with detailed tables |
 | 🏗️ [Architecture Deep Dive](docs/architecture_deep_dive.md) | Implementation-level guide: data flow, weight sharing, routing logic, training recipe |
 
@@ -307,7 +307,7 @@ RSRA-4B is the **only** approach that simultaneously provides intrinsic verifica
 | **DSVD** (2024–25) | Post-hoc | ✓ | ✗ | ✗ | ✗ |
 | **PRM** (Lightman et al., 2023) | Post-hoc | ✗ | ✗ | N/A | ✗ |
 | **Quiet-STaR** (Zelikman et al., 2024) | Token-space | ✗ | ✗ | ✗ | ✓ |
-| **RSRA-4B** (Ours) | **✓ Intrinsic** | **✓** | **✓ 4-tier** | **✓ Dual** | **✓** |
+| **RSRA-4B** (Ours) | **✓ Intrinsic** | **✓** | **✓ 4-tier** | **✓ Banach** | **✓** |
 
 > **COCONUT** answers *"can we reason in latent space?"* — RSRA-4B answers the harder follow-up: ***"how do we know the latent reasoning is correct, and what do we do when it isn't?"***
 
@@ -340,7 +340,7 @@ RSRA-4B directly satisfies the four evaluation pillars of the [SPRIND Next Front
 | SPRIND Criterion | RSRA-4B Response | Status |
 |-----------------|------------------|--------|
 | **Disruptive Approach** | Replaces the autoregressive forward pass with intrinsic latent verification — not an incremental optimization of existing architectures | ✅ |
-| **Existing Artifacts** | Full codebase: 6 core modules, 4 simulation scripts, 170+ tests, 4 scientific documents, formal proofs | ✅ |
+| **Existing Artifacts** | Full codebase: 6 core modules, 4 simulation scripts, 232 tests, 4 scientific documents, formal proofs | ✅ |
 | **Economic Viability** | €37.5K compute for Stage 1 (1.25% of budget) — extreme capital efficiency via weight reuse | ✅ |
 | **Frontier Impact** | Structural elimination of hallucination cascades; mathematically provable reasoning advantage; paradigm shift from *scale-to-memorize* to *scale-to-reason* | ✅ |
 
@@ -377,6 +377,9 @@ The test suite covers:
 - ✅ KV-cache memory scaling independence
 - ✅ Reasoning decay modeling and accuracy bounds
 - ✅ Full RSRA block end-to-end pipeline
+- ✅ Frozen context feedback loop prevention and done-mask reconstruction
+- ✅ Prompt supervision and pad-only masking in checker loss
+- ✅ Monotone operator deprecation warnings
 
 ---
 

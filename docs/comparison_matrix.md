@@ -31,7 +31,7 @@
 | **Verification space** | — | — | — | — | — | — | Latent | Token | Token | **Latent** |
 | **Adaptive compute** | Fixed-point convergence | Probabilistic halt | Scalar halt | Learned iterations | Depth routing | Diffusion steps | Backtrack on anomaly | Best-of-N search | Thought length | **Checker-gated + tier routing** |
 | **Hierarchical abstraction** | None | None | None | None | None | None | None | None | None | **4-tier** |
-| **Convergence guarantee** | Partial (DEQ theory) | None | None | None | None | None | None | N/A | None | **Dual (Banach + monotone)** |
+| **Convergence guarantee** | Partial (DEQ theory) | None | None | None | None | None | None | N/A | None | **Banach contraction** |
 | **Training strategy** | Implicit diff | REINFORCE | Ponder cost | Standard LM | Router training | Denoising objective | Separate probe training | Separate verifier | REINFORCE mixing | **Joint tri-objective** |
 | **Memory scaling (reasoning depth)** | $O(1)$ | $O(1)$ | $O(1)$ | $O(1)$ | $O(1)$ | $O(1)$ | $O(N)$ | $O(N)$ | $O(N)$ | **$O(1)$** |
 | **Operates in latent space** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | **✓** |
@@ -51,7 +51,7 @@
 | **Verification space** | Where does verification occur? *Token* = evaluates decoded text; *Latent* = evaluates hidden state vectors. |
 | **Adaptive compute** | How does the architecture allocate variable computation? *None* = fixed compute per token; *Scalar halt* = binary stop/continue; *Checker-gated* = quality-informed halting; *Depth routing* = token-specific depth; *Tier routing* = routing across abstraction levels. |
 | **Hierarchical abstraction** | Does the architecture operate at multiple levels of abstraction? *None* = single-level; *Multi-level* = qualitatively different processing at different tiers. |
-| **Convergence guarantee** | Are there formal proofs that the iterative process converges? *None* = no guarantee; *Partial* = convergence under specific conditions; *Dual* = two independent convergence pathways. |
+| **Convergence guarantee** | Are there formal proofs that the iterative process converges? *None* = no guarantee; *Partial* = convergence under specific conditions; *Banach contraction* = spectral normalization enforces ρ < 1, guaranteeing unique fixed-point convergence at geometric rate. |
 | **Training strategy** | How is the adaptive computation trained? *Joint* = single unified loss; *Separate* = independently trained components; *REINFORCE* = policy gradient for discrete decisions. |
 | **Memory scaling** | How does KV-cache memory grow with reasoning depth $N$? $O(1)$ = constant; $O(N)$ = linear. |
 
@@ -85,7 +85,7 @@
 | Halting criterion | Solver tolerance $\|h_{k+1} - h_k\| < \varepsilon$ | Checker confidence $v \geq \tau$ |
 | Abstraction levels | 1 | 4 (Operative → Fallback) |
 | Training signal for iteration quality | None | Checker MSE against consequence targets |
-| Convergence proof | Banach (if contractive) | Dual: Banach + Monotone |
+| Convergence proof | Banach (if contractive) | Banach contraction (spectral norm) |
 
 RSRA-4B inherits DEQ's mathematical foundation but adds the critical missing ingredient: an *informed* convergence process that knows *why* it should iterate more and *what* a good fixed point looks like.
 
@@ -117,7 +117,7 @@ RSRA-4B inherits DEQ's mathematical foundation but adds the critical missing ing
 | Diagnostic content | "Stop/continue" | "Quality is $v$, target is $v_{\text{target}}$, deficit is $\delta$" |
 | Training for halting | REINFORCE (high variance) | Direct MSE supervision (low variance) |
 | Escalation | None | 4-tier hierarchical routing |
-| Convergence proof | None | Dual: Banach + Monotone |
+| Convergence proof | None | Banach contraction (spectral norm) |
 
 RSRA-4B replaces PonderNet's uninformative halting signal with a *semantically rich* quality evaluation, and supplements depth-wise iteration with breadth-wise abstraction routing.
 
@@ -148,7 +148,7 @@ RSRA-4B replaces PonderNet's uninformative halting signal with a *semantically r
 | Output selection | Weighted average of all iterates | Final converged state (proven fixed point) |
 | Halting information | Scalar halt score | Rich checker evaluation with consequence targets |
 | Architecture | RNN-focused | Transformer-native |
-| Convergence | No formal guarantee | Dual: Banach + Monotone |
+| Convergence | No formal guarantee | Banach contraction (spectral norm) |
 | Abstraction routing | None | 4-tier hierarchy |
 
 ---
@@ -182,7 +182,7 @@ RSRA-4B replaces PonderNet's uninformative halting signal with a *semantically r
 | Error detection during reasoning | Impossible | Built-in via checker threshold $\tau$ |
 | Error correction during reasoning | Impossible | Refinement operator $R_l$ with contraction guarantee |
 | Abstraction levels | 1 | 4 tiers with escalation |
-| Convergence proof | None | Dual: Banach + Monotone |
+| Convergence proof | None | Banach contraction (spectral norm) |
 | Training signal for reasoning quality | None (implicit via final loss) | Explicit: checker MSE against $v_{\text{target}}$ |
 | Compute allocation | Fixed iterations | Dynamic: checker-gated + tier routing |
 
@@ -216,7 +216,7 @@ RSRA-4B replaces PonderNet's uninformative halting signal with a *semantically r
 | Route decision basis | Heuristic router | Checker confidence evaluation |
 | Verification of intermediate states | None | Checker networks |
 | Correction of bad states | None (hope more iterations help) | Targeted refinement $R_l$ |
-| Convergence guarantee | None | Dual: Banach + Monotone |
+| Convergence guarantee | None | Banach contraction (spectral norm) |
 
 **Key distinction:** MoR asks "how many times should I iterate?"; RSRA-4B asks "is the result correct, and if not, what type of processing does it need?"
 
@@ -248,7 +248,7 @@ RSRA-4B replaces PonderNet's uninformative halting signal with a *semantically r
 | Quality signal | Denoising score function | Checker evaluation against $v_{\text{target}}$ |
 | Iteration count | Typically 10–100+ | $O(\log(1/\varepsilon))$ via contraction guarantee |
 | Task alignment | Implicit (learns data distribution) | Explicit (consequence targets encode task utility) |
-| Convergence guarantee | Score matching convergence | Dual: Banach + Monotone |
+| Convergence guarantee | Score matching convergence | Banach contraction (spectral norm) |
 
 ---
 
@@ -369,10 +369,11 @@ RSRA-4B replaces PonderNet's uninformative halting signal with a *semantically r
    - No prior work trains generation, verification, and compute efficiency in a single end-to-end loss
    - The FLOPs penalty is critical for preventing degenerate solutions (always iterate to $K_{\max}$)
 
-4. **Dual Convergence Guarantees**
-   - Banach contraction provides the strongest guarantee (uniqueness + geometric rate)
-   - Monotone operator theory provides a fallback with relaxed constraints
-   - No competitor offers both; most offer neither
+4. **Banach Contraction Convergence Guarantee**
+   - Spectral normalization enforces $\|R_l\|_{\text{op}} \leq \rho < 1$, guaranteeing unique fixed-point convergence at geometric rate $O(\rho^k)$
+   - Refinement uses convex combination $R(h) = (1-\rho)h + \rho \cdot g(h)$, ensuring strict contraction
+   - Monotone operator theory was explored as a secondary pathway but is **deprecated** in the current implementation (appending a skew-symmetric matrix post-MLP does not satisfy the monotonicity requirements of Winston & Kolter 2020)
+   - No competitor offers formal convergence guarantees enforced via spectral normalization; most offer none
 
 ### Where RSRA-4B Is Not Yet Superior
 

@@ -474,6 +474,23 @@ The joint loss has three components, each serving a distinct purpose:
 │    - Map outcomes to continuous utility: v_target ∈ [0,1]       │
 │    - High v_target = state led to correct solution              │
 │    - Low v_target = state led to error/rollback                 │
+│                                                                 │
+│  IMPLEMENTATION NOTES (critical fixes):                         │
+│                                                                 │
+│  1. Done-mask & frozen context fix:                             │
+│     Tokens that have already converged (v ≥ τ) are tracked     │
+│     via a per-token done_mask. Their v_target is overridden    │
+│     to 1.0 in subsequent iterations. Without this, micro-      │
+│     shifts from self-attention over still-refining neighbors   │
+│     cause the checker to report tiny quality drops on frozen   │
+│     tokens, triggering infinite feedback loops (the "frozen    │
+│     context illusion").                                         │
+│                                                                 │
+│  2. Prompt supervision fix:                                     │
+│     L_CE is computed over all non-padding tokens               │
+│     (input_ids ≠ pad_id), not just response tokens             │
+│     (labels ≠ -100). This prevents "prompt blindness" where   │
+│     the model ignores prompt content during refinement.        │
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐

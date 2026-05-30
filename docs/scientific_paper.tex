@@ -42,7 +42,7 @@ Evidence Repository}
 \maketitle
 
 \begin{abstract}
-We introduce the \textbf{Recursive Self-Reflective Architecture (RSRA-4B)}, a novel transformer variant that replaces the standard autoregressive forward pass with intrinsic, differentiable self-reflection in latent space. Modern large language models generate tokens without verifying the coherence of their internal representations, leading to compounding errors and hallucination cascades in long-horizon reasoning. Post-hoc verification methods --- process reward models, RLHF, and chain-of-thought prompting --- address this failure mode externally, after erroneous representations have already been committed. RSRA-4B embeds structural \textit{checker networks} directly into a four-tier abstraction hierarchy (Operative, Tactical, Strategic, Fallback), enabling each hidden state to be continuously evaluated against a learned \textit{consequence space} and recursively refined before tokenization. We prove convergence of the refinement dynamics via dual guarantees: Banach contraction mapping and monotone operator theory. A tri-objective joint loss function --- combining cross-entropy, checker mean-squared error against latent consequence targets, and a FLOPs penalty --- trains verification jointly with generation. Preliminary simulations demonstrate 85\% KV-cache memory reduction versus equivalent chain-of-thought reasoning and sustained $>$68\% accuracy on 100-step logical sequences where standard autoregressive models degrade to $<$1\%. The 3B-parameter Stage 1 model requires only $\sim$15,000 H100 GPU hours ($\sim$€37,500), allocating $>$98\% of the €3M Stage 1 budget to talent, data, and infrastructure.
+We introduce the \textbf{Recursive Self-Reflective Architecture (RSRA-4B)}, a novel transformer variant that replaces the standard autoregressive forward pass with intrinsic, differentiable self-reflection in latent space. Modern large language models generate tokens without verifying the coherence of their internal representations, leading to compounding errors and hallucination cascades in long-horizon reasoning. Post-hoc verification methods --- process reward models, RLHF, and chain-of-thought prompting --- address this failure mode externally, after erroneous representations have already been committed. RSRA-4B embeds structural \textit{checker networks} directly into a four-tier abstraction hierarchy (Operative, Tactical, Strategic, Fallback), enabling each hidden state to be continuously evaluated against a learned \textit{consequence space} and recursively refined before tokenization. We prove convergence of the refinement dynamics via Banach contraction mapping (the primary and sole active guarantee in the current implementation), with monotone operator theory retained as a deprecated theoretical alternative (see Appendix~\ref{appendix:proofs}). A tri-objective joint loss function --- combining cross-entropy, checker mean-squared error against latent consequence targets, and a FLOPs penalty --- trains verification jointly with generation. Preliminary simulations demonstrate 85\% KV-cache memory reduction versus equivalent chain-of-thought reasoning and sustained $>$68\% accuracy on 100-step logical sequences where standard autoregressive models degrade to $<$1\%. The 3B-parameter Stage 1 model requires only $\sim$15,000 H100 GPU hours ($\sim$€37,500), allocating $>$98\% of the €3M Stage 1 budget to talent, data, and infrastructure.
 \end{abstract}
 
 \hrule
@@ -67,7 +67,7 @@ These methods share a critical limitation: they operate in \textit{token space} 
     \item \textbf{Integrated Checker Networks} that evaluate each hidden state against a learned \textit{consequence space} --- a latent representation of the downstream utility of the current state --- trained jointly with the generation objective.
     \item \textbf{A four-tier hierarchical abstraction routing} mechanism (Operative $\to$ Tactical $\to$ Strategic $\to$ Fallback) that dynamically allocates compute by escalating uncertain representations to higher abstraction levels.
     \item \textbf{A tri-objective joint loss function} $\mathcal{L}_{\text{joint}} = \mathcal{L}_{\text{CE}}(y, \hat{y}) + \gamma \mathcal{L}_{\text{checker}} + \lambda_{\text{flops}} \Omega_{\text{flops}} + \lambda_{\text{conv}} \Omega_{\text{conv}}$ that trains verification, generation, computational efficiency, and convergence simultaneously.
-    \item \textbf{Dual convergence guarantees} via Banach contraction mapping and monotone operator theory, ensuring that the recursive refinement dynamics provably converge.
+    \item \textbf{Convergence guarantees} via Banach contraction mapping --- the primary and sole active convergence pathway in the current implementation. Monotone operator theory (Theorem~2 in Appendix~\ref{appendix:proofs}) is retained as a theoretical alternative but is deprecated in practice, as appending a skew-symmetric matrix to an MLP does not satisfy the monotonicity requirements of Winston \& Kolter (2020), which demand embedding the monotone structure inside the implicit layer equation.
 \end{enumerate}
 This architecture shifts the paradigm from \textit{scale-to-memorize} to \textit{scale-to-reason}: a model that dynamically allocates more computation to difficult tokens, detects its own errors before they propagate, and provably converges to stable representations.
 
@@ -181,6 +181,8 @@ The four-tier hierarchy implements a cognitively inspired compute allocation str
 \end{itemize}
 Routing is \textit{bottom-up and demand-driven}: computation begins at the Operative tier. Only tokens that fail to achieve checker confidence after $K_{\max}$ refinement iterations are escalated to the Tactical tier, and so on. This ensures that easy tokens (articles, prepositions, predictable continuations) consume minimal compute, while genuinely difficult tokens (logical connectives, numerical reasoning, factual claims) receive deep, multi-tier processing.
 
+\paragraph{Per-sequence min-confidence routing.} Escalation decisions use \textit{per-sequence minimum} confidence rather than batch-global mean confidence. Specifically, the routing score for a sequence is computed as $\texttt{score.min().item()}$ across all active tokens in the sequence. This guarantees that \textit{every token} within a sequence must converge before the sequence is accepted at a given tier, preventing the failure mode where a few high-confidence tokens mask unconverged tokens in the same sequence.
+
 \paragraph{Escalation criterion:} A token is escalated from tier $l$ to tier $l+1$ when:
 \[ \sum_{k=1}^{K_{\max}} v_{l,t}^{(k)} < K_{\max} \cdot \tau_l \quad \text{(cumulative confidence deficit)} \]
 
@@ -193,6 +195,8 @@ The joint loss function trains all components simultaneously:
 
 \paragraph{Component 2: Checker MSE Loss $\mathcal{L}_{\text{checker}}$} --- Trains the checker networks to accurately predict the consequence utility of each hidden state. The targets $v_{\text{target}}$ are completely detached to avoid perverse gradients. The targets are derived from a synthetic data pipeline: a 70B teacher model wrapped in an MCTS environment solves complex reasoning tasks, and the intermediate states (including rejected steps, rollbacks, and corrections) are mapped to continuous utility scores. This creates \textit{(state, consequence)} training pairs that teach the checker to evaluate reasoning quality.
 
+\textit{Supervision masking.} The checker loss is computed only over \textbf{non-padding tokens} (i.e., positions where $\texttt{input\_ids} \neq \texttt{pad\_id}$), rather than masking all prompt tokens via the label mask ($\texttt{labels} = -100$). This \textit{pad-only masking} ensures that prompt tokens receive checker supervision, preventing the model from developing ``prompt blindness'' --- an inability to evaluate the quality of representations for tokens it did not generate itself.
+
 \paragraph{Component 3: Differentiable FLOPs Penalty Proxy $\Omega_{\text{flops}}$} --- Penalizes low checker confidence, acting as a fully differentiable proxy for compute allocation. Parameterized as:
 \[ \Omega_{\text{flops}} = 1.0 - \text{mean}\bigl(v_{l,t}^{(k)}\bigr) \]
 where $v_{l,t}^{(k)}$ are the checker scores. High checker scores early allow early exit, minimizing computed FLOPs.
@@ -200,6 +204,8 @@ where $v_{l,t}^{(k)}$ are the checker scores. High checker scores early allow ea
 \paragraph{Component 4: Explicit Convergence Penalty $\Omega_{\text{conv}}$} --- Incentivizes the generator and refiner to produce converging latent states. Parameterized as:
 \[ \Omega_{\text{conv}} = \frac{1}{K-1} \sum_{k=1}^{K-1} \frac{\|h_{l,t}^{(k)} - h_{l,t}^{(k-1)}\|^2}{d_{\text{model}}} \]
 which penalizes large distances between consecutive states, driving the system to a fixed point.
+
+\paragraph{Token-level done-mask tracking.} The recursive refinement loop maintains a per-token \texttt{done\_mask} $\mathbf{m}_t \in \{0, 1\}^T$ that tracks which tokens have converged (checker score $\geq \tau_l$). Crucially, the done-mask is \textit{reconstructed step-by-step} from initial conditions at the start of each forward pass, rather than persisted across iterations. This prevents the ``frozen context illusion'': when a token converges early (marked done), its hidden state is frozen, but subsequent self-attention iterations over other tokens may cause micro-shifts in its representation. Without step-by-step reconstruction, these micro-shifts can push the checker score below the threshold, re-entering the refinement loop and creating an infinite feedback cycle. The fix overrides the convergence target to $1.0$ for already-converged tokens, ensuring that self-attention-induced perturbations do not trigger spurious re-refinement.
 
 \section{Experimental Evidence}
 
@@ -262,6 +268,18 @@ Static standard transformers do not trace paths sequentially. Instead, they expl
 
 \paragraph{2. The "Over-Refinement" Effect (Representation Drift)}
 Forcing RSRA to evaluate for exactly $K_{\text{eval}}=20$ iterations at test-time (when trained with variable iterations $K_{\text{train}} \le 10$) causes the continuous state representations to drift from the contraction region, leading to chance-level decay. Capping the test-time iteration limit at $K_{\text{eval}} = \max(5, N+3)$ preserves Banach contraction and successfully stabilizes inference.
+
+\subsection{Post-Review Architectural Corrections}
+
+Comprehensive post-review analysis (232 unit and integration tests) identified and resolved four critical architectural bugs that, while not affecting the theoretical results above, had significant implications for the correctness and stability of the training pipeline:
+
+\paragraph{1. Frozen Context Illusion.} When tokens converge early and are marked as ``done'' by the checker, their hidden states are frozen. However, subsequent self-attention iterations over other (still-active) tokens cause micro-shifts in the frozen token's representation via cross-attention. Without correction, these perturbations push the checker score below the convergence threshold, causing the token to re-enter the refinement loop --- creating an infinite feedback cycle. The fix overrides convergence targets to $1.0$ for already-converged tokens and reconstructs the done-mask step-by-step from initial conditions at each forward pass.
+
+\paragraph{2. Prompt Blindness.} The original checker supervision mask used $\texttt{labels} \neq -100$ (the standard causal LM label mask), which excluded all prompt tokens from checker loss computation. This prevented the checker from learning to evaluate prompt representations, degrading its ability to assess the quality of context that the model conditions on but does not generate. The fix uses pad-only masking ($\texttt{input\_ids} \neq \texttt{pad\_id}$), ensuring prompt tokens receive full checker supervision.
+
+\paragraph{3. Batch-Coupled Routing.} The original hierarchical routing used $\texttt{score.mean().item()}$ to compute a batch-global confidence score for escalation decisions. This coupled independent sequences: a single high-confidence sequence could prevent escalation for a low-confidence sequence in the same batch. The fix uses $\texttt{score.min().item()}$ (per-sequence minimum), ensuring that every token in every sequence must individually converge before accepting the batch at a given tier.
+
+\paragraph{4. Monotone Operator Deprecation.} The monotone operator convergence pathway (Theorem~2) required embedding the skew-symmetric parameterization \textit{inside} the implicit layer equation $h = R(h)$, as specified by Winston \& Kolter (2020). The original implementation appended the skew-symmetric matrix to the end of an MLP, which does not satisfy the required monotonicity conditions. Since the Banach contraction pathway (Theorem~1) provides complete convergence guarantees via spectral normalization, the monotone pathway has been deprecated. The theoretical results in Theorem~2 remain valid but are annotated as inactive in the codebase.
 
 \subsection{Empirical Verification: Generative Path-Tracing}
 
@@ -350,7 +368,7 @@ The extreme compute efficiency of RSRA-4B ($\sim$1.25\% of budget on compute) ar
 \subsection{What RSRA-4B Achieves}
 \begin{enumerate}
     \item \textbf{Structural self-correction:} Differentiable verification jointly with generation in continuous latent space, enabling error correction \textit{before} token commitment.
-    \item \textbf{Formal convergence guarantees:} Dual pathways (Banach contraction and monotone operators) provide theoretical assurance that refinement dynamics are well-behaved.
+    \item \textbf{Formal convergence guarantees:} Banach contraction mapping via spectral normalization provides the primary convergence guarantee with geometric rate $O(\rho^k)$. Monotone operator theory (Theorem~2) provides a theoretical alternative pathway but is currently deprecated in the implementation due to parameterization constraints.
     \item \textbf{Extreme compute efficiency:} Parameter reuse across recursive iterations enables deep reasoning with minimal parameter overhead.
     \item \textbf{Memory efficiency:} $O(1)$ KV-cache scaling with respect to reasoning depth, versus $O(N)$ for token-space reasoning approaches.
 \end{enumerate}
@@ -360,7 +378,7 @@ The extreme compute efficiency of RSRA-4B ($\sim$1.25\% of budget on compute) ar
 
 \textbf{Checker target quality depends on the synthetic data pipeline.} The consequence targets $v_{\text{target}}$ are derived from MCTS rollouts of a teacher model. If the teacher model's reasoning is itself flawed, or if the mapping from MCTS trajectories to continuous utility scores is poorly calibrated, the checker will learn incorrect quality signals.
 
-\textbf{Spectral norm constraints may limit expressivity.} The Banach contraction requirement ($\|R_l\|_{\text{op}} \leq \rho < 1$) restricts the function class of refinement operators, potentially preventing the model from learning certain useful transformations. The monotone operator alternative (Theorem 2) relaxes this constraint while preserving convergence.
+\textbf{Spectral norm constraints may limit expressivity.} The Banach contraction requirement ($\|R_l\|_{\text{op}} \leq \rho < 1$) restricts the function class of refinement operators, potentially preventing the model from learning certain useful transformations. The monotone operator alternative (Theorem 2) was intended to relax this constraint while preserving convergence; however, this pathway is currently deprecated in the implementation because the skew-symmetric parameterization must be embedded inside the implicit layer equation --- not appended to an MLP --- to satisfy the monotonicity requirements of Winston \& Kolter (2020). Investigating a correct monotone implementation remains future work.
 
 \textbf{Hierarchical routing adds architectural complexity.} The four-tier hierarchy introduces hyperparameters ($\tau_l$ thresholds, $K_{\max}$ per tier, tier-specific learning rates) that may require extensive tuning.
 
@@ -528,6 +546,9 @@ The refinement iteration $h_{k+1} = R_l(h_k)$ can be viewed as a forward Euler d
 
 \subsection{Theorem 2: Monotone Operator Convergence}
 
+\noindent\textit{\textbf{Implementation status: DEPRECATED.} The monotone operator pathway is theoretically valid but is not active in the current RSRA-4B implementation. The skew-symmetric parameterization of Corollary~2.1 must be embedded inside the implicit layer equation $h = R(h)$, as required by Winston \& Kolter (2020). The original implementation incorrectly appended the skew-symmetric matrix to the end of an MLP, which does not satisfy the monotonicity conditions. All active configurations use the Banach contraction pathway (Theorem~1) exclusively. The theorem below is retained for completeness and as a basis for future work.}
+
+\vspace{0.5em}
 This theorem provides an alternative convergence guarantee that does not require the strict contraction condition $\rho < 1$, potentially allowing greater model expressivity.
 
 \subsubsection{Statement}
@@ -586,13 +607,18 @@ Substituting:
 The optimal damping parameter is $\beta^* = \mu$, yielding rate $(1 - \mu^2)^{1/2}$ per iteration. \hfill$\square$
 
 \subsubsection{Corollary 2.1 (Monotone Parameterization via Winston \& Kolter)}
+
+\noindent\textit{\textbf{Note:} This corollary is deprecated in the current implementation. See the deprecation notice at the beginning of Section~\ref{appendix:proofs}.2 for details.}
+
 \begin{corollary}
 Following Winston \& Kolter (2020), the refinement operator can be parameterized as:
 \[ R_l(h) = \sigma\bigl((W - W^\top + sI) h + b\bigr) \]
-where $\sigma$ is a monotone activation, $W \in \mathbb{R}^{d \times d}$, $s \geq 0$, and $b \in \mathbb{R}^d$. This parameterization automatically ensures $F_l = I - R_l$ satisfies the conditions of Theorem 2.
+where $\sigma$ is a monotone activation, $W \in \mathbb{R}^{d \times d}$, $s \geq 0$, and $b \in \mathbb{R}^d$. This parameterization automatically ensures $F_l = I - R_l$ satisfies the conditions of Theorem 2, \textit{provided} the skew-symmetric structure is embedded inside the implicit layer equation $h = R_l(h)$ and not merely appended to an MLP.
 \end{corollary}
 
 \noindent\textbf{Proof sketch.} The matrix $A = W - W^\top$ is skew-symmetric, so $\langle Ah, h \rangle = 0$ for all $h$. Adding $sI$ gives $\langle (A + sI)h, h \rangle = s\|h\|^2 \geq 0$. Composing with a monotone activation preserves monotonicity. \hfill$\square$
+
+\noindent\textbf{Implementation caveat.} The original RSRA-4B implementation appended the skew-symmetric matrix to the final layer of the refinement MLP rather than embedding it within the fixed-point equation. This architectural choice does not satisfy the monotonicity conditions required by Theorem~2. Correctly implementing the monotone pathway would require restructuring the refinement operator so that $R_l$ itself has the form $\sigma((W - W^\top + sI)h + b)$, which conflicts with the current MLP-based state generator architecture. The Banach contraction pathway (Theorem~1) provides equivalent convergence guarantees without this structural constraint.
 
 \subsection{Theorem 3: Bounded Compute Guarantee}
 

@@ -22,7 +22,7 @@
 
 ## Abstract
 
-We introduce the **Recursive Self-Reflective Architecture (RSRA-4B)**, a novel transformer variant that replaces the standard autoregressive forward pass with intrinsic, differentiable self-reflection in latent space. Modern large language models generate tokens without verifying the coherence of their internal representations, leading to compounding errors and hallucination cascades in long-horizon reasoning. Post-hoc verification methods — process reward models, RLHF, and chain-of-thought prompting — address this failure mode externally, after erroneous representations have already been committed. RSRA-4B embeds structural *checker networks* directly into a four-tier abstraction hierarchy (Operative, Tactical, Strategic, Fallback), enabling each hidden state to be continuously evaluated against a learned *consequence space* and recursively refined before tokenization. We prove convergence of the refinement dynamics via dual guarantees: Banach contraction mapping and monotone operator theory. A tri-objective joint loss function — combining cross-entropy, checker mean-squared error against latent consequence targets, and a FLOPs penalty — trains verification jointly with generation. Preliminary simulations demonstrate 85% KV-cache memory reduction versus equivalent chain-of-thought reasoning and sustained >68% accuracy on 100-step logical sequences where standard autoregressive models degrade to <1%. The 3B-parameter Stage 1 model requires only ~15,000 H100 GPU hours (~€37,500), allocating >98% of the €3M Stage 1 budget to talent, data, and infrastructure.
+We introduce the **Recursive Self-Reflective Architecture (RSRA-4B)**, a novel transformer variant that replaces the standard autoregressive forward pass with intrinsic, differentiable self-reflection in latent space. Modern large language models generate tokens without verifying the coherence of their internal representations, leading to compounding errors and hallucination cascades in long-horizon reasoning. Post-hoc verification methods — process reward models, RLHF, and chain-of-thought prompting — address this failure mode externally, after erroneous representations have already been committed. RSRA-4B embeds structural *checker networks* directly into a four-tier abstraction hierarchy (Operative, Tactical, Strategic, Fallback), enabling each hidden state to be continuously evaluated against a learned *consequence space* and recursively refined before tokenization. We prove convergence of the refinement dynamics via Banach contraction mapping theory, with spectral normalization and convex combination ensuring geometric convergence to a unique fixed point. A tri-objective joint loss function — combining cross-entropy, checker mean-squared error against latent consequence targets, and a FLOPs penalty — trains verification jointly with generation. Preliminary simulations demonstrate 85% KV-cache memory reduction versus equivalent chain-of-thought reasoning and sustained >68% accuracy on 100-step logical sequences where standard autoregressive models degrade to <1%. The 3B-parameter Stage 1 model requires only ~15,000 H100 GPU hours (~€37,500), allocating >98% of the €3M Stage 1 budget to talent, data, and infrastructure.
 
 ---
 
@@ -45,7 +45,7 @@ These methods share a critical limitation: they operate in *token space* and int
 1. **Integrated Checker Networks** that evaluate each hidden state against a learned *consequence space* — a latent representation of the downstream utility of the current state — trained jointly with the generation objective.
 2. **A four-tier hierarchical abstraction routing** mechanism (Operative → Tactical → Strategic → Fallback) that dynamically allocates compute by escalating uncertain representations to higher abstraction levels.
 3. **A tri-objective joint loss function** $\mathcal{L}_{\text{joint}} = \mathcal{L}_{\text{CE}}(y, \hat{y}) + \gamma \mathcal{L}_{\text{checker}} + \lambda_{\text{flops}} \Omega_{\text{flops}} + \lambda_{\text{conv}} \Omega_{\text{conv}}$ that trains verification, generation, computational efficiency, and convergence simultaneously.
-4. **Dual convergence guarantees** via Banach contraction mapping and monotone operator theory, ensuring that the recursive refinement dynamics provably converge.
+4. **Formal convergence guarantee** via Banach contraction mapping with spectral normalization, ensuring geometric convergence to a unique fixed point.
 
 This architecture shifts the paradigm from *scale-to-memorize* to *scale-to-reason*: a model that dynamically allocates more computation to difficult tokens, detects its own errors before they propagate, and provably converges to stable representations.
 
@@ -59,7 +59,7 @@ RSRA-4B draws on and differentiates itself from a diverse body of work spanning 
 
 **Deep Equilibrium Models (DEQs)** (Bai et al., 2019; Bai et al., 2020) reformulate deep networks as implicit layers that compute the fixed point $h^* = f_\theta(h^*, x)$ of a single transformation. This elegant formulation provides infinite-depth representations with constant memory, and the Jacobian-free backpropagation through the fixed-point equation enables tractable training.
 
-**Monotone Operator DEQs (monDEQs)** (Winston & Kolter, 2020) strengthen this foundation by parameterizing $f_\theta$ to be a monotone operator, guaranteeing existence and uniqueness of the fixed point without requiring contractivity. This removes the need for careful spectral norm tuning.
+**Monotone Operator DEQs (monDEQs)** (Winston & Kolter, 2020) strengthen this foundation by parameterizing $f_\theta$ to be a monotone operator, guaranteeing existence and uniqueness of the fixed point without requiring contractivity. This removes the need for careful spectral norm tuning. However, RSRA-4B's implementation has deprecated the monotone operator mode because the skew-symmetric parameterization was applied outside the implicit layer equation, violating the conditions required by this theory (Winston & Kolter 2020 require embedding the monotone structure inside the implicit layer equation). All active convergence guarantees rely on the Banach contraction mapping.
 
 **Differentiation from RSRA-4B.** DEQs pursue "blind" convergence to a fixed point without evaluating the *quality* of intermediate iterates. There is no mechanism analogous to our checker networks: the iteration either converges or it does not, with no diagnostic signal about *why* an intermediate state is unsatisfactory. RSRA-4B introduces three key departures: (i) checker-gated halting replaces blind convergence with an informed stopping criterion, (ii) hierarchical routing across four abstraction levels replaces single-level iteration, and (iii) the tri-objective loss trains convergence quality (via consequence targets) alongside convergence existence. We do, however, adopt the convergence guarantees from DEQ theory — specifically, spectral norm constraints (Banach) and monotone parameterization — as foundations for our convergence proofs (see [Section 4](#4-mathematical-foundations)).
 
@@ -100,7 +100,7 @@ COCONUT (Hao et al., 2024) is the most directly relevant competitor to RSRA-4B. 
 | **Verification** | None — latent reasoning proceeds without quality evaluation | Checker networks evaluate each state against consequence targets |
 | **Abstraction** | Single-level continuous thought | 4-tier hierarchical routing (Operative → Strategic) |
 | **Training signal** | Standard language modeling loss | Tri-objective: CE + checker MSE + FLOPs penalty |
-| **Convergence** | No formal guarantees | Dual guarantees: Banach contraction + monotone operators |
+| **Convergence** | No formal guarantees | Banach contraction mapping with spectral normalization |
 
 COCONUT demonstrates that latent-space reasoning *works*; RSRA-4B adds the critical missing components: *verification* (how do we know the latent reasoning is correct?), *hierarchy* (how do we allocate different types of compute?), and *convergence* (how do we guarantee the iteration terminates at a useful state?).
 
@@ -130,7 +130,7 @@ Dynamic Self-Verify Decoding (2024–2025) attaches parallel probing heads to fr
 | Space | Latent | Latent | Latent | Latent | Latent | Latent | Token | Token | **Latent** |
 | Hierarchical | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | **4-tier** |
 | Joint training | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | **✓** |
-| Convergence | Partial | ✗ | ✗ | ✗ | ✗ | ✗ | N/A | ✗ | **Dual** |
+| Convergence | Partial | ✗ | ✗ | ✗ | ✗ | ✗ | N/A | ✗ | **Banach** |
 | $O(1)$ memory | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | **✓** |
 
 ---
@@ -288,6 +288,9 @@ We establish four foundational theorems that underpin the correctness and effici
 
 ### 4.2 Convergence via Monotone Operator Theory
 
+> [!WARNING]
+> **Deprecated in implementation.** The monotone operator mode has been deprecated in RSRA-4B's implementation. The skew-symmetric parameterization was applied as a post-hoc layer appended to the MLP, rather than being embedded inside the implicit layer equation as required by Winston & Kolter (2020). This architectural placement violates the monotonicity conditions necessary for the theoretical guarantees below to hold. All active convergence guarantees rely exclusively on the Banach contraction mapping (Theorem 1). This theorem is retained for theoretical completeness and as a reference for potential future re-implementation.
+
 > **Theorem 2 (Monotone Operator Convergence).** *Let $R_l$ be parameterized as a monotone operator (following Winston & Kolter, 2020). Then the Krasnoselskii–Mann iteration*
 >
 > $$h_{k+1} = (1 - \beta) h_k + \beta \, R_l(h_k), \quad \beta \in (0, 1)$$
@@ -296,7 +299,7 @@ We establish four foundational theorems that underpin the correctness and effici
 
 **Proof sketch.** The monotone parameterization ensures $\langle R_l(h_1) - R_l(h_2), h_1 - h_2 \rangle \geq 0$ for all $h_1, h_2$. The forward–backward splitting operator $(I + R_l)^{-1}$ is firmly nonexpansive, and the Krasnoselskii–Mann iteration on firmly nonexpansive operators converges (Bauschke & Combettes, 2017).
 
-**Advantage over Banach contraction.** The monotone approach does not require $\rho < 1$, relaxing the spectral norm constraint and potentially allowing greater expressivity. It provides an alternative convergence pathway when strict contractivity is too restrictive.
+**Advantage over Banach contraction (theoretical).** The monotone approach does not require $\rho < 1$, relaxing the spectral norm constraint and potentially allowing greater expressivity. It provides an alternative convergence pathway when strict contractivity is too restrictive. However, realizing this advantage requires correct embedding of the monotone structure within the implicit layer equation, which the current implementation does not achieve.
 
 ### 4.3 Bounded Compute Guarantee
 
@@ -434,7 +437,7 @@ The recursive parameter reuse provides favorable scaling properties:
 ### 7.1 What RSRA-4B Achieves
 
 1. **Structural self-correction:** The first architecture to embed differentiable verification jointly with generation in continuous latent space, enabling error correction *before* token commitment.
-2. **Formal convergence guarantees:** Dual pathways (Banach contraction and monotone operators) provide theoretical assurance that the refinement dynamics are well-behaved.
+2. **Formal convergence guarantees:** Banach contraction mapping with spectral normalization provides theoretical assurance that the refinement dynamics are well-behaved, guaranteeing geometric convergence to a unique fixed point.
 3. **Extreme compute efficiency:** Parameter reuse across recursive iterations enables deep reasoning with minimal parameter overhead.
 4. **Memory efficiency:** $O(1)$ KV-cache scaling with respect to reasoning depth, versus $O(N)$ for token-space reasoning approaches.
 
@@ -446,7 +449,7 @@ We are committed to intellectual honesty about what remains unproven:
 
 **Checker target quality depends on the synthetic data pipeline.** The consequence targets $v_{\text{target}}$ are derived from MCTS rollouts of a teacher model. If the teacher model's reasoning is itself flawed, or if the mapping from MCTS trajectories to continuous utility scores is poorly calibrated, the checker will learn incorrect quality signals. Mitigation: we plan to validate checker calibration extensively against ground-truth reasoning tasks with known correct derivations.
 
-**Spectral norm constraints may limit expressivity.** The Banach contraction requirement ($\|R_l\|_{\text{op}} \leq \rho < 1$) restricts the function class of refinement operators, potentially preventing the model from learning certain useful transformations. Mitigation: the monotone operator alternative (Theorem 2) relaxes this constraint while preserving convergence.
+**Spectral norm constraints may limit expressivity.** The Banach contraction requirement ($\|R_l\|_{\text{op}} \leq \rho < 1$) restricts the function class of refinement operators, potentially preventing the model from learning certain useful transformations. A monotone operator alternative (Theorem 2) could theoretically relax this constraint, but its implementation has been deprecated due to mathematical inconsistencies in the parameterization (the skew-symmetric structure was applied outside the implicit layer equation, violating the conditions required by Winston & Kolter, 2020). Future work may explore correct re-implementation of the monotone pathway.
 
 **Hierarchical routing adds architectural complexity.** The four-tier hierarchy introduces hyperparameters ($\tau_l$ thresholds, $K_{\max}$ per tier, tier-specific learning rates) that may require extensive tuning. Mitigation: we will begin with a two-tier (Operative + Tactical) model and incrementally add tiers based on empirical evidence.
 
