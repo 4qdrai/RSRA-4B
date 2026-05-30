@@ -30,9 +30,8 @@ from typing import List
 import torch
 import torch.nn as nn
 
-from rsra.core.checker import ContinuousChecker
-from rsra.core.generator import StateGenerator
-from rsra.core.refinement import RefinementOperator, ConstraintMode
+from rsra.core.refinement import ConstraintMode
+from rsra.core.rsra_block import RSRABlock, RSRABlockConfig
 
 
 # ======================================================================
@@ -100,36 +99,44 @@ class HierarchyConfig:
 # ======================================================================
 
 class _Tier(nn.Module):
-    """Internal module representing one tier of the hierarchy."""
+    """Internal module representing one tier of the hierarchy.
+
+    Delegates to :class:`RSRABlock` for the generate-check-refine loop,
+    gaining token-level adaptive halting (``done_mask``, ``torch.where``
+    freezing) while maintaining a simple return signature for the
+    :class:`HierarchicalRouter`.
+    """
 
     def __init__(self, cfg: TierConfig) -> None:
         super().__init__()
         self.cfg = cfg
-        self.generator = StateGenerator(
+        self.block = RSRABlock(RSRABlockConfig(
             d_model=cfg.d_model,
             n_heads=cfg.n_heads,
             d_ff=cfg.d_ff,
+            tau=cfg.tau_threshold,
+            max_iterations=cfg.max_iterations,
             dropout=cfg.dropout,
-        )
-        self.checker = ContinuousChecker(
-            d_model=cfg.d_model, dropout=cfg.dropout
-        )
-        self.refiner = RefinementOperator(
-            d_model=cfg.d_model,
             constraint=cfg.constraint,
             contraction_factor=cfg.contraction_factor,
-            dropout=cfg.dropout,
-        )
+        ))
 
     def forward(
-        self, h: torch.Tensor
+        self,
+        h: torch.Tensor,
+        key_padding_mask: torch.Tensor | None = None,
+        attn_mask: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor, int]:
-        """Run the generate-check-refine loop.
+        """Run the generate-check-refine loop via :class:`RSRABlock`.
 
         Parameters
         ----------
         h : torch.Tensor
             Input state ``(batch, seq_len, d_model)``.
+        key_padding_mask : torch.Tensor | None, optional
+            Padding mask for self-attention ``(batch, seq_len)``.
+        attn_mask : torch.Tensor | None, optional
+            Causal attention mask ``(seq_len, seq_len)``.
 
         Returns
         -------
@@ -140,19 +147,17 @@ class _Tier(nn.Module):
         iters_used : int
             Number of iterations actually executed.
         """
-        for k in range(self.cfg.max_iterations):
-            h_tilde = self.generator(h)
-            v = self.checker(h_tilde)
-
-            # Check per-sample pass: use *min* confidence
-            if v.min().item() >= self.cfg.tau_threshold:
-                return h_tilde, v, k + 1
-
-            # Refine and loop
-            h = self.refiner(h_tilde, v)
-
-        # Exhausted iterations — return last state
-        return h_tilde, v, self.cfg.max_iterations  # type: ignore[possibly-undefined]
+        block_out = self.block(
+            h,
+            key_padding_mask=key_padding_mask,
+            attn_mask=attn_mask,
+        )
+        last_score = (
+            block_out.checker_scores[-1]
+            if block_out.checker_scores
+            else torch.zeros(h.shape[0], h.shape[1], 1, device=h.device)
+        )
+        return block_out.output_state, last_score, block_out.iterations_used
 
 
 # ======================================================================
@@ -203,7 +208,10 @@ class HierarchicalRouter(nn.Module):
     # Forward
     # ------------------------------------------------------------------
     def forward(
-        self, h: torch.Tensor
+        self,
+        h: torch.Tensor,
+        key_padding_mask: torch.Tensor | None = None,
+        attn_mask: torch.Tensor | None = None,
     ) -> dict[str, torch.Tensor | int | list[str]]:
         """Route a hidden state through the 4-tier hierarchy.
 
@@ -211,6 +219,10 @@ class HierarchicalRouter(nn.Module):
         ----------
         h : torch.Tensor
             Input hidden state ``(batch, seq_len, d_model_tier1)``.
+        key_padding_mask : torch.Tensor | None, optional
+            Padding mask for self-attention ``(batch, seq_len)``.
+        attn_mask : torch.Tensor | None, optional
+            Causal attention mask ``(seq_len, seq_len)``.
 
         Returns
         -------
@@ -233,7 +245,11 @@ class HierarchicalRouter(nn.Module):
 
         for level, tier in enumerate(self.tiers):
             routing_path.append(self.TIER_NAMES[level])
-            output, score, iters = tier(h)
+            output, score, iters = tier(
+                h,
+                key_padding_mask=key_padding_mask,
+                attn_mask=attn_mask,
+            )
             total_iters += iters
 
             # Accepted?
