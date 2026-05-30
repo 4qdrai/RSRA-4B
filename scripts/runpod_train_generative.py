@@ -571,6 +571,7 @@ def run_generative_benchmark():
         tau=config.rsra_tau,
         max_iterations=config.rsra_train_max_iters,
         min_iterations=3,  # prevent premature halting on step 1
+        context_dim=config.d_model,
     )
     rsra_block = RSRABlock(block_cfg)
     rsra = GenerativeRSRA(

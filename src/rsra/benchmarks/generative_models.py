@@ -187,6 +187,7 @@ class GenerativeRSRA(nn.Module):
         # Run through causal RSRA block
         rsra_out = self.rsra_block(
             x,
+            context=x,
             key_padding_mask=pad_mask,
             attn_mask=causal_mask,
         )
