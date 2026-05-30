@@ -1,0 +1,11 @@
+{
+  "baseline": [],
+  "rsra": [],
+  "config": {
+    "d_model": 32,
+    "n_heads": 2,
+    "d_ff": 128,
+    "baseline_params": 33507,
+    "rsra_params": 36324
+  }
+}
