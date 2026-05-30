@@ -115,3 +115,77 @@ def test_complex_dataset_data_loader():
         batch_count += 1
         
     assert batch_count == 2
+
+
+def test_generative_greedy_evaluation_bounds_fix():
+    """Verify that evaluate_greedy_accuracy does not trigger index out of bounds errors
+
+    when running autoregressive generation on complex datasets where sequence lengths
+    would otherwise grow beyond max_seq_len.
+    """
+    from rsra.benchmarks.baseline_transformer import BaselineConfig
+    from rsra.benchmarks.generative_models import GenerativeBaselineTransformer, GenerativeRSRA
+    from rsra.core.rsra_block import RSRABlock, RSRABlockConfig
+    from scripts.runpod_train_generative import evaluate_greedy_accuracy
+    
+    max_seq_len = 64  # deliberately small to trigger potential overflow easily
+    max_vars = 30
+    tokenizer = GenerativeTRLCTokenizer(max_vars=max_vars)
+    
+    # Create dataset where combined length of prompt + target could exceed max_seq_len (64)
+    # Rules: core rules (3) + decoy trees + cyclic loops will easily exceed 40-50 tokens.
+    # Target path variables adds further tokens, pushing it close to or beyond max_seq_len.
+    dataset = ComplexGenerativeTRLCDataset(
+        size=4,
+        n_range=(3, 4),
+        max_vars=max_vars,
+        branching_factor=2,
+        decoy_depth=2,
+        num_cycles=1,
+        max_seq_len=max_seq_len,
+        seed=123,
+        tokenizer=tokenizer,
+    )
+    
+    loader = DataLoader(dataset, batch_size=2)
+    device = torch.device("cpu")
+    
+    # 1. Test Baseline Causal Decoder
+    base_cfg = BaselineConfig(
+        vocab_size=tokenizer.vocab_size,
+        d_model=32,
+        n_heads=2,
+        n_layers=1,
+        d_ff=64,
+        max_seq_len=max_seq_len,
+        pad_id=tokenizer.pad_id,
+    )
+    baseline = GenerativeBaselineTransformer(base_cfg)
+    
+    # Should run successfully without throwing "index out of range" or gather errors
+    acc_base = evaluate_greedy_accuracy(baseline, loader, tokenizer, device, is_rsra=False)
+    assert isinstance(acc_base, float)
+    assert 0.0 <= acc_base <= 1.0
+    
+    # 2. Test RSRA Causal Decoder
+    block_cfg = RSRABlockConfig(
+        d_model=32,
+        n_heads=2,
+        d_ff=64,
+        tau=0.5,
+        max_iterations=3,
+    )
+    rsra_block = RSRABlock(block_cfg)
+    rsra = GenerativeRSRA(
+        rsra_block,
+        tokenizer.vocab_size,
+        d_model=32,
+        max_seq_len=max_seq_len,
+        pad_id=tokenizer.pad_id,
+    )
+    
+    # Should also run successfully without throwing "index out of range"
+    acc_rsra = evaluate_greedy_accuracy(rsra, loader, tokenizer, device, is_rsra=True)
+    assert isinstance(acc_rsra, float)
+    assert 0.0 <= acc_rsra <= 1.0
+

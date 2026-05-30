@@ -84,12 +84,16 @@ def evaluate_early_exit_telemetry(
                 max_gen = len(target) + 4
                 
                 for _ in range(max_gen):
+                    # Ensure sequence length does not exceed max_seq_len of the model to avoid pos_embedding overflow
+                    max_len = model.max_seq_len if is_rsra else model.config.max_seq_len
+                    model_input = prompt[:, -max_len:] if prompt.size(1) > max_len else prompt
+                    
                     if is_rsra:
-                        logits, _, iters, _, _ = model(prompt)
+                        logits, _, iters, _, _ = model(model_input)
                         total_iters_accum += iters
                         total_generation_steps += 1
                     else:
-                        logits, _ = model(prompt)
+                        logits, _ = model(model_input)
                     
                     next_token_logits = logits[0, -1, :]
                     next_token = torch.argmax(next_token_logits).item()
