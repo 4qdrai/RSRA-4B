@@ -75,6 +75,8 @@ python scripts/runpod_train_generative.py \
     --branching_factor 3 \
     --decoy_depth 3 \
     --num_cycles 3 \
+    --rsra_train_max_iters 16 \
+    --rsra_eval_max_iters 30 \
     --results_dir results/generative_benchmark_complex_h100
 ```
 

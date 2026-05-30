@@ -56,8 +56,8 @@ class GenerativeH100Config:
     n_heads: int = 4
     d_ff: int = 512
     baseline_n_layers: int = 1
-    rsra_train_max_iters: int = 10
-    rsra_eval_max_iters: int = 20
+    rsra_train_max_iters: int = 16
+    rsra_eval_max_iters: int = 30
     rsra_tau: float = 0.95
 
     max_vars: int = 20
@@ -471,6 +471,8 @@ def run_generative_benchmark():
     parser.add_argument("--lr", type=float, default=5e-4, help="Learning rate")
     parser.add_argument("--batch_size", type=int, default=256, help="Batch size")
     parser.add_argument("--baseline_n_layers", type=int, default=1, help="Number of layers in the Baseline Transformer")
+    parser.add_argument("--rsra_train_max_iters", type=int, default=16, help="Max iterations during training")
+    parser.add_argument("--rsra_eval_max_iters", type=int, default=30, help="Max iterations during evaluation")
     
     # Complex task arguments
     parser.add_argument("--task_type", type=str, default="standard", choices=["standard", "complex"], help="Task type to train on")
@@ -488,6 +490,8 @@ def run_generative_benchmark():
     config.lr = args.lr
     config.batch_size = args.batch_size
     config.baseline_n_layers = args.baseline_n_layers
+    config.rsra_train_max_iters = args.rsra_train_max_iters
+    config.rsra_eval_max_iters = args.rsra_eval_max_iters
     config.results_dir = args.results_dir
     
     if args.task_type == "complex":
