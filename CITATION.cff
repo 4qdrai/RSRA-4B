@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+title: "RSRA-4B: Recursive Self-Reflective Architecture"
+message: "If you use this software, please cite it as below."
+type: software
+authors:
+  - name: "RSRA-4B Research Team"
+version: 0.1.0
+date-released: 2026-05-31
+url: "https://github.com/4qdrai/RSRA-4B"
+abstract: "RSRA-4B embeds structural checker networks and recursive self-monitoring directly into the transformer forward pass, enabling formal self-correction before tokenization. The architecture achieves geometric convergence through Banach contraction mappings with spectral normalization."
+keywords:
+  - self-reflective architecture
+  - recursive reasoning
+  - Banach contraction
+  - autonomous systems
+  - formal verification
+license: MPL-2.0

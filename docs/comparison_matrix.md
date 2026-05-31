@@ -388,7 +388,7 @@ RSRA-4B replaces PonderNet's uninformative halting signal with a *semantically r
 | No synthetic data required | COCONUT, MoR | Requires MCTS teacher pipeline for $v_{\text{target}}$ |
 | Mature training recipe | DEQ | Novel training procedure (untested at scale) |
 
-These gaps represent Stage 1 risks that the SPRIND funding will address.
+These gaps represent Stage 1 risks that future funding will address.
 
 ---
 

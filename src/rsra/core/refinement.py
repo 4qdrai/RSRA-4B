@@ -268,9 +268,10 @@ class RefinementOperator(nn.Module):
 
             ||R(x) - R(y)|| <= (1 - rho + rho * L_g) ||x - y||
 
-        where ``L_g <= 1`` by spectral normalisation.  In practice
-        ``L_g < 1`` because GELU reduces the effective Lipschitz
-        constant, so strict contraction holds for any ``rho in (0, 1)``.
+        where ``L_g <= 1`` by spectral normalisation.  ScaledGELU
+        (dividing by 1.12) ensures ``Lip(activation) <= 1``, and
+        spectral normalization ensures each linear layer has ``Lip <= 1``.
+        Strict contraction therefore holds for any ``rho in (0, 1)``.
         """
         # --- Compute correction via MLP ---
         # CRITICAL: No LayerNorm for BANACH/DUAL modes!

@@ -1,6 +1,6 @@
 # Recursive Self-Reflective Architecture (RSRA-4B): Intrinsic Latent Verification for Frontier Reasoning
 
-> **SPRIND Next Frontier AI Challenge — Evidence Repository**
+> **Technical Evidence Repository**
 > *Scientific Documentation v1.0*
 
 ---
@@ -47,7 +47,7 @@ These methods share a critical limitation: they operate in *token space* and int
 3. **A tri-objective joint loss function** $\mathcal{L}_{\text{joint}} = \mathcal{L}_{\text{CE}}(y, \hat{y}) + \gamma \mathcal{L}_{\text{checker}} + \lambda_{\text{flops}} \Omega_{\text{flops}} + \lambda_{\text{conv}} \Omega_{\text{conv}}$ that trains verification, generation, computational efficiency, and convergence simultaneously.
 4. **Formal convergence guarantee** via Banach contraction mapping with spectral normalization, ensuring geometric convergence to a unique fixed point.
 
-This architecture shifts the paradigm from *scale-to-memorize* to *scale-to-reason*: a model that dynamically allocates more computation to difficult tokens, detects its own errors before they propagate, and provably converges to stable representations.
+This architecture reorients scaling from memorization capacity toward reasoning capability: a model that dynamically allocates more computation to difficult tokens, detects its own errors before they propagate, and provably converges to stable representations.
 
 ---
 
@@ -389,7 +389,7 @@ Both models were trained using progressive curriculum pre-training sweeps:
 #### Empirical Findings & Scaling Insights
 
 *   **Logical Decay and Noise Collapse in Baselines:** In the standard task, the static Causal Decoder baseline struggles, peaking at only 33.20% accuracy before collapsing down to a mere **5.86%** validation accuracy in Phase 3 when distractor rules are active. When recursive decoys and loop traps are introduced in the complex task, the baseline fails entirely, collapsing to a maximum accuracy of just 7.42% and closing Phase 3 at **5.08%**. This confirms that standard causal decoders cannot route logical paths when forced to operate in equivalent capacity budgets.
-*   **Logical Robustness in RSRA-4B:** RSRA-4B maintains sustained high accuracy across all phases. In the standard task, RSRA achieves a perfect **97.66%** accuracy at the end of Phase 1 and closes Phase 3 at **89.06%** exact-path accuracy. Even when bombarded with recursive decoys and loop traps in the complex task, RSRA dynamically scales its latent computation (averaging 5.97 thinking steps) to bypass traps and filter out decoys, closing the 181-epoch curriculum sweep at a remarkable **90.63% exact-path accuracy** (with a peak of **98.05%**). This highlights that RSRA's logical scaling superiority is highly consistent across both edge-deployable (264k parameters) and capacity-expanded (1.18M parameters) scales.
+*   **Logical Robustness in RSRA-4B:** RSRA-4B maintains sustained high accuracy across all phases. In the standard task, RSRA achieves a perfect **97.66%** accuracy at the end of Phase 1 and closes Phase 3 at **89.06%** exact-path accuracy. Even when bombarded with recursive decoys and loop traps in the complex task, RSRA dynamically scales its latent computation (averaging 5.97 thinking steps) to bypass traps and filter out decoys, closing the 181-epoch curriculum sweep at **90.63% exact-path accuracy** (with a peak of **98.05%**). This highlights that RSRA's logical scaling superiority is highly consistent across both edge-deployable (264k parameters) and capacity-expanded (1.18M parameters) scales.
 
 #### Empirical Dominance Visualized
 
@@ -438,7 +438,7 @@ The recursive parameter reuse provides favorable scaling properties:
 
 ### 7.1 What RSRA-4B Achieves
 
-1. **Structural self-correction:** The first architecture to embed differentiable verification jointly with generation in continuous latent space, enabling error correction *before* token commitment.
+1. **Structural self-correction:** To our knowledge, the first architecture to embed differentiable verification jointly with generation in continuous latent space, enabling error correction *before* token commitment.
 2. **Formal convergence guarantees:** Banach contraction mapping with spectral normalization provides theoretical assurance that the refinement dynamics are well-behaved, guaranteeing geometric convergence to a unique fixed point.
 3. **Extreme compute efficiency:** Parameter reuse across recursive iterations enables deep reasoning with minimal parameter overhead.
 4. **Memory efficiency:** $O(1)$ KV-cache scaling with respect to reasoning depth, versus $O(N)$ for token-space reasoning approaches.

@@ -10,7 +10,6 @@
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10%2B-blue?logo=python&logoColor=white" alt="Python 3.10+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-green" alt="License Apache 2.0"></a>
   <a href="#running-the-test-suite"><img src="https://img.shields.io/badge/tests-232%20passing-brightgreen" alt="Tests 232 Passing"></a>
-  <a href="https://www.sprind.org/en/challenges/next-frontier-ai/"><img src="https://img.shields.io/badge/SPRIND-Next%20Frontier%20AI%202026-orange?logo=data:image/svg+xml;base64," alt="SPRIND Challenge 2026"></a>
 </p>
 
 ---
@@ -25,9 +24,9 @@ Modern large language models generate tokens blindly — each hidden state is co
 |--------|-------|-------------|
 | **KV-Cache Scaling** | **O(1) memory with reasoning depth** | Latent recursion generates zero intermediate tokens (see operating-point analysis below) |
 | **Convergence Guarantees** | **Banach contraction mapping** (spectral normalization + convex combination) | Geometric convergence to unique fixed point with rate c = 1 - ρ(1 - L_g) < 1 |
-| **Reasoning Preservation** | **>30x improvement** at 100 reasoning steps | Standard: 0.6% accuracy -> RSRA-4B: >19.7% (conservative) to >68% (multi-tier) |
+| **Reasoning Preservation** | **>30x improvement** at 100 reasoning steps (simulation) | Standard: 0.6% accuracy -> RSRA-4B: >19.7% (conservative) to >68% (multi-tier) |
 | **Parameter Efficiency** | **4.75x fewer parameters** | RSRA 4.0M params vs baseline 19.1M params with comparable accuracy on TRLC (H100 benchmark) |
-| **Stage 1 Compute** | **EUR 37,500** (~15K H100-hrs) | 1.25% of EUR 3M budget — frees 98.75% for talent & data |
+| **Proof-of-Concept Compute** | **EUR 37,500** (~15K H100-hrs) | Initial PoC training budget. Full Stage 1 scaling is projected at 150,000 H100-hours. |
 
 ### KV-Cache Memory Reduction: Operating-Point Analysis
 
@@ -103,7 +102,7 @@ RSRA-4B augments a transformer backbone with three structural components at each
 
 - **🏔️ 4-Tier Hierarchical Routing** — Computation flows bottom-up: easy tokens resolve at the fast Operative tier; hard tokens escalate through Tactical, Strategic, and Fallback tiers — each with distinct parameterization and abstraction level, using token-level adaptive early exit, with per-sequence min-confidence routing ensuring every active token converges before acceptance.
 
-- **⚖️ Tri-Objective Joint Loss** — A single differentiable loss trains everything end-to-end:
+- **⚖️ Multi-Objective Joint Loss** — A single differentiable loss trains everything end-to-end:
 
 $$\mathcal{L}_{\text{joint}} = \mathcal{L}_{\text{CE}}(y, \hat{y}) + \gamma \mathcal{L}_{\text{checker}} + \lambda_{\text{flops}} \Omega_{\text{flops}} + \lambda_{\text{conv}} \Omega_{\text{conv}}$$
 
@@ -213,8 +212,8 @@ Both runs completed progressive curriculum pre-training sweeps:
 
 ### Key Takeaways
 
-1. **Pure Architectural Superiority (Strict Weight Parity):**
-   When matched within identical parameter footprints (1.19x and 1.17x ratios), standard causal decoders completely fail at sequential logical tracing under distractions (dropping below 6% exact accuracy). RSRA-4B's dynamic recurrent state-refinement provides a massive reasoning advantage (89.06% and 90.63% accuracies), proving that its logical edge is architectural rather than capacity-driven.
+1. **Architectural Advantage Under Weight Parity:**
+   When matched within identical parameter footprints (1.19x and 1.17x ratios), standard causal decoders completely fail at sequential logical tracing under distractions (dropping below 6% exact accuracy). RSRA-4B's dynamic recurrent state-refinement provides a substantial reasoning advantage (89.06% and 90.63% accuracies), indicating that its logical edge is architectural rather than capacity-driven.
 
 2. **Banach Contraction Guarantees Generalization:**
    By formalizing refinement as a contractive mapping and dynamically scaling test-time iterations ($K_{\text{eval}} = \max(5, N+2)$), we completely cured the "Over-Refinement" decay that caused early prototype models to drift and get stuck at 50% chance levels. RSRA hidden states remain stable even at deep reasoning bounds.
@@ -252,7 +251,7 @@ RSRA-4B/
 │   │   ├── generator.py               ←   State generators (Gₗ)
 │   │   ├── refinement.py              ←   Contraction-constrained refinement (Rₗ)
 │   │   ├── hierarchy.py               ←   4-tier routing logic
-│   │   ├── joint_loss.py              ←   Tri-objective loss function
+│   │   ├── joint_loss.py              ←   Multi-objective loss function
 │   │   └── rsra_block.py              ←   Full RSRA block (G + C + R pipeline)
 │   ├── simulations/                   ← Evidence-generating simulations
 │   │   ├── convergence_analysis.py    ←   Banach contraction validation
@@ -296,7 +295,7 @@ RSRA-4B/
 
 ## 🥊 Key Differentiators vs. Prior Work
 
-RSRA-4B is the **only** approach that simultaneously provides intrinsic verification, latent-space operation, hierarchical abstraction, formal convergence guarantees, and joint training. No existing method covers more than two of these five properties.
+To our knowledge, RSRA-4B is the **only** published approach that simultaneously provides intrinsic verification, latent-space operation, hierarchical abstraction, formal convergence guarantees, and joint training. No existing method covers more than two of these five properties.
 
 | Approach | Verification | Latent-Space | Hierarchy | Convergence | Joint Training |
 |----------|:------------:|:------------:|:---------:|:-----------:|:--------------:|
@@ -335,24 +334,6 @@ The remaining **98.75%** of Stage 1 funding goes where it matters most: elite en
 
 ---
 
-## 🇪🇺 SPRIND Challenge Alignment
-
-RSRA-4B directly satisfies the four evaluation pillars of the [SPRIND Next Frontier AI Challenge](https://www.sprind.org/en/challenges/next-frontier-ai/):
-
-| SPRIND Criterion | RSRA-4B Response | Status |
-|-----------------|------------------|--------|
-| **Disruptive Approach** | Replaces the autoregressive forward pass with intrinsic latent verification — not an incremental optimization of existing architectures | ✅ |
-| **Existing Artifacts** | Full codebase: 6 core modules, 4 simulation scripts, 232 tests, 4 scientific documents, formal proofs | ✅ |
-| **Economic Viability** | €37.5K compute for Stage 1 (1.25% of budget) — extreme capital efficiency via weight reuse | ✅ |
-| **Frontier Impact** | Structural elimination of hallucination cascades; mathematically provable reasoning advantage; paradigm shift from *scale-to-memorize* to *scale-to-reason* | ✅ |
-
-**Scaling Pathway:**
-
-| Stage | Model Size | Training Tokens | Objective |
-|-------|-----------|----------------|-----------|
-| **Stage 1** (7 months, €3M) | 3B | 300B | Proof of concept: validate convergence, checker calibration, reasoning improvement on GSM8K, MATH, ARC |
-| **Stage 2** (8 months, €8M) | 10–30B | 1T | Scale model; optimize MCTS data pipeline; frontier benchmark evaluation |
-| **Stage 3** (9 months, €15.5M) | 70B+ | 5T+ | Frontier-competitive model with full hierarchical routing; MMLU, HumanEval, multi-step math |
 
 ---
 
@@ -393,7 +374,7 @@ The test suite covers:
                Intrinsic Latent Verification for Frontier Reasoning},
   author    = {{RSRA-4B Team}},
   year      = {2026},
-  note      = {Evidence repository for the SPRIND Next Frontier AI Challenge},
+  note      = {Working implementation and evidence repository},
   url       = {https://github.com/4qdrai/RSRA-4B}
 }
 ```
@@ -408,7 +389,7 @@ This project is licensed under the [Apache License 2.0](LICENSE).
 
 ## 🙏 Acknowledgments
 
-This work builds upon foundational research in implicit deep learning (Bai et al., 2019), adaptive computation (Graves, 2016; Banino et al., 2021), latent reasoning (Hao et al., 2024), and joint embedding predictive architectures (LeCun, 2022). We gratefully acknowledge [SPRIND — the Federal Agency for Breakthrough Innovation](https://www.sprind.org/) for creating the Next Frontier AI Challenge and the opportunity to pursue fundamental architectural innovation in European AI.
+This work builds upon foundational research in implicit deep learning (Bai et al., 2019), adaptive computation (Graves, 2016; Banino et al., 2021), latent reasoning (Hao et al., 2024), and joint embedding predictive architectures (LeCun, 2022). We acknowledge the support of public innovation initiatives in European AI.
 
 ---
 
