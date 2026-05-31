@@ -48,9 +48,9 @@ We establish the notation and standard results used throughout.
 
 We rely on the following classical theorems:
 
-**Banach Fixed-Point Theorem** (Banach, 1922). *Let $(X, d)$ be a complete metric space and $T : X \to X$ a contraction with rate $\rho \in [0, 1)$. Then $T$ has a unique fixed point $x^* \in X$, and for any $x_0 \in X$, the sequence $x_{k+1} = T(x_k)$ satisfies $d(x_k, x^*) \leq \rho^k \, d(x_0, x^*)$.*
+**Banach Fixed-Point Theorem** (Banach, 1922). Let $(X, d)$ be a complete metric space and $T : X \to X$ a contraction with rate $\rho \in [0, 1)$. Then $T$ has a unique fixed point $x^* \in X$, and for any $x_0 \in X$, the sequence $x_{k+1} = T(x_k)$ satisfies $d(x_k, x^*) \leq \rho^k \, d(x_0, x^*)$.
 
-**Krasnoselskii–Mann Theorem** (Krasnoselskii, 1955; Mann, 1953). *Let $T : \mathcal{H} \to \mathcal{H}$ be nonexpansive with $\mathrm{Fix}(T) \neq \emptyset$. For $\beta \in (0, 1)$, the iteration $h_{k+1} = (1 - \beta) h_k + \beta T(h_k)$ converges weakly to a fixed point of $T$.*
+**Krasnoselskii–Mann Theorem** (Krasnoselskii, 1955; Mann, 1953). Let $T : \mathcal{H} \to \mathcal{H}$ be nonexpansive with $\mathrm{Fix}(T) \neq \emptyset$. For $\beta \in (0, 1)$, the iteration $h_{k+1} = (1 - \beta) h_k + \beta T(h_k)$ converges weakly to a fixed point of $T$.
 
 ---
 
@@ -64,17 +64,17 @@ This theorem establishes that the RSRA refinement operator, under spectral norm 
 >
 > $$R_l(h) = (1 - \rho) \cdot h + \rho \cdot g_l(h, \mathrm{ctx})$$
 >
-> *where $g_l$ is a neural network whose weight matrices are spectrally normalized so that $g_l$ has Lipschitz constant $L_g \leq 1$, and $\rho \in (0, 1)$ is the contraction factor. Then:*
+> where $g_l$ is a neural network whose weight matrices are spectrally normalized so that $g_l$ has Lipschitz constant $L_g \leq 1$, and $\rho \in (0, 1)$ is the contraction factor. Then:
 >
-> *(i) **Contraction Property.** $R_l$ is a contraction with rate $c = 1 - \rho + \rho \cdot L_g < 1$ (since $L_g < 1$ in practice due to the contractive effect of GELU activations in the activated space, and $c \leq 1$ in the worst-case boundary where $L_g \leq 1$).*
+> - **(i)** **Contraction Property.** $R_l$ is a contraction with rate $c = 1 - \rho + \rho \cdot L_g < 1$ (since $L_g < 1$ in practice due to the contractive effect of GELU activations in the activated space, and $c \leq 1$ in the worst-case boundary where $L_g \leq 1$).
 >
-> *(ii) **Existence and Uniqueness.** There exists a unique fixed point $h^* \in \mathbb{R}^d$ such that $R_l(h^*) = h^*$.*
+> - **(ii)** **Existence and Uniqueness.** There exists a unique fixed point $h^* \in \mathbb{R}^d$ such that $R_l(h^*) = h^*$.
 >
-> *(iii) **Geometric Convergence.** For any initial state $h_0 \in \mathbb{R}^d$, the sequence defined by $h_{k+1} = R_l(h_k)$ satisfies:*
+> - **(iii)** **Geometric Convergence.** For any initial state $h_0 \in \mathbb{R}^d$, the sequence defined by $h_{k+1} = R_l(h_k)$ satisfies:
 >
 > $$\|h_k - h^*\| \leq c^k \|h_0 - h^*\|$$
 >
-> *(iv) **Iteration Complexity.** Convergence to $\varepsilon$-accuracy (i.e., $\|h_k - h^*\| \leq \varepsilon$) requires at most:*
+> - **(iv)** **Iteration Complexity.** Convergence to $\varepsilon$-accuracy (i.e., $\|h_k - h^*\| \leq \varepsilon$) requires at most:
 >
 > $$K_\varepsilon = \left\lceil \frac{\log(\|h_0 - h^*\| / \varepsilon)}{\log(1/c)} \right\rceil$$
 >
@@ -134,7 +134,7 @@ suffices. $\square$
 
 ### Corollary 1.1 (A Priori Error Bound)
 
-> *For any $k \geq 0$:*
+> For any $k \geq 0$:
 >
 > $$\|h_k - h^*\| \leq \frac{c^k}{1 - c} \|h_1 - h_0\|$$
 
@@ -146,7 +146,7 @@ This bound is useful in practice because it depends only on the *first step diff
 
 ### Corollary 1.2 (A Posteriori Error Bound)
 
-> *For any $k \geq 1$:*
+> For any $k \geq 1$:
 >
 > $$\|h_k - h^*\| \leq \frac{c}{1 - c} \|h_k - h_{k-1}\|$$
 
@@ -183,19 +183,19 @@ This theorem provides an alternative convergence guarantee that does not require
 >
 > $$\langle F_l(h_1) - F_l(h_2), \; h_1 - h_2 \rangle \geq 0, \quad \forall h_1, h_2 \in \mathbb{R}^d$$
 >
-> *and additionally $F_l$ is $\mu$-cocoercive for some $\mu > 0$:*
+> and additionally $F_l$ is $\mu$-cocoercive for some $\mu > 0$:
 >
 > $$\langle F_l(h_1) - F_l(h_2), \; h_1 - h_2 \rangle \geq \mu \|F_l(h_1) - F_l(h_2)\|^2$$
 >
-> *Assume $\mathrm{Fix}(R_l) \neq \emptyset$. Then the Krasnoselskii–Mann (KM) iteration:*
+> Assume $\mathrm{Fix}(R_l) \neq \emptyset$. Then the Krasnoselskii–Mann (KM) iteration:
 >
 > $$h_{k+1} = (1 - \beta) h_k + \beta \, R_l(h_k), \quad \beta \in (0, 1)$$
 >
-> *converges to a fixed point $h^* \in \mathrm{Fix}(R_l)$. Moreover, if $F_l$ is $\mu$-strongly monotone:*
+> converges to a fixed point $h^* \in \mathrm{Fix}(R_l)$. Moreover, if $F_l$ is $\mu$-strongly monotone:
 >
 > $$\langle F_l(h_1) - F_l(h_2), \; h_1 - h_2 \rangle \geq \mu \|h_1 - h_2\|^2$$
 >
-> *then the fixed point is unique and convergence is linear with rate $(1 - 2\beta\mu + \beta^2)^{1/2}$.*
+> then the fixed point is unique and convergence is linear with rate $(1 - 2\beta\mu + \beta^2)^{1/2}$.
 
 ### Proof
 
@@ -277,7 +277,7 @@ The optimal damping parameter is $\beta^* = \mu$, yielding rate $(1 - \mu^2)^{1/
 >
 > $$R_l(h) = \sigma\bigl((W - W^\top + sI) h + b\bigr)$$
 >
-> *where $\sigma$ is a monotone activation (e.g., ReLU), $W \in \mathbb{R}^{d \times d}$, $s \geq 0$ is a bias toward strong monotonicity, and $b \in \mathbb{R}^d$. This parameterization automatically ensures $F_l = I - R_l$ satisfies the conditions of Theorem 2.*
+> where $\sigma$ is a monotone activation (e.g., ReLU), $W \in \mathbb{R}^{d \times d}$, $s \geq 0$ is a bias toward strong monotonicity, and $b \in \mathbb{R}^d$. This parameterization automatically ensures $F_l = I - R_l$ satisfies the conditions of Theorem 2.
 
 **Proof sketch.** The matrix $A = W - W^\top$ is skew-symmetric, so $\langle Ah, h \rangle = 0$ for all $h$. Adding $sI$ gives $\langle (A + sI)h, h \rangle = s\|h\|^2 \geq 0$. Composing with a monotone activation preserves monotonicity of $F_l$ (Ryu & Boyd, 2016). $\square$
 
@@ -299,9 +299,9 @@ This theorem ensures that RSRA-4B's adaptive computation cannot degenerate into 
 >
 > $$\mathrm{FLOPs}_{\mathrm{total}}(t) \leq \sum_{l=1}^{L} K_{\max} \cdot C_{\mathrm{block}}(l)$$
 >
-> *(ii) **Differentiable Compute Control.** The expected number of iterations per token is controlled by the differentiable proxy $\Omega_{\mathrm{flops}} = 1.0 - \text{mean}(v_{l,t}^{(k)})$. High checker confidence $\bar{v} \to 1.0$ minimizes the FLOPs penalty and corresponds to early halting (fewer iterations), establishing a smooth, differentiable compute-efficiency trade-off.*
+> - **(ii)** **Differentiable Compute Control.** The expected number of iterations per token is controlled by the differentiable proxy $\Omega_{\mathrm{flops}} = 1.0 - \text{mean}(v_{l,t}^{(k)})$. High checker confidence $\bar{v} \to 1.0$ minimizes the FLOPs penalty and corresponds to early halting (fewer iterations), establishing a smooth, differentiable compute-efficiency trade-off.
 >
-> *(iii) **Deterministic bound.** For any token $t$ and any input $x$:*
+> - **(iii)** **Deterministic bound.** For any token $t$ and any input $x$:
 >
 > $$\mathrm{FLOPs}_{\mathrm{total}}(t) \leq L \cdot K_{\max} \cdot \max_l C_{\mathrm{block}}(l) = O(K_{\max} \cdot C_{\mathrm{block}})$$
 
@@ -355,9 +355,9 @@ This theorem formalizes the key memory advantage of latent-space reasoning over 
 >
 > $$M_{\mathrm{KV}}(N) = M_{\mathrm{KV}}(1) = 2 \cdot n_{\mathrm{heads}} \cdot d_{\mathrm{head}} \cdot n_{\mathrm{layers}}$$
 >
-> *That is, $M_{\mathrm{KV}}$ is $O(1)$ with respect to $N$.*
+> That is, $M_{\mathrm{KV}}$ is $O(1)$ with respect to $N$.
 >
-> *In contrast, for a chain-of-thought model generating $N$ intermediate reasoning tokens, the additional KV-cache memory is:*
+> In contrast, for a chain-of-thought model generating $N$ intermediate reasoning tokens, the additional KV-cache memory is:
 >
 > $$M_{\mathrm{KV}}^{\mathrm{CoT}}(N) = N \cdot 2 \cdot n_{\mathrm{heads}} \cdot d_{\mathrm{head}} \cdot n_{\mathrm{layers}} = O(N)$$
 
@@ -396,7 +396,7 @@ For $N = 10$ reasoning steps, RSRA uses $10\times$ less KV-cache memory. For $N 
 
 ### Corollary 4.1 (Batch Size Scaling)
 
-> *For a fixed GPU memory budget $M_{\mathrm{GPU}}$, the maximum batch size for RSRA-4B is:*
+> For a fixed GPU memory budget $M_{\mathrm{GPU}}$, the maximum batch size for RSRA-4B is:
 >
 > $$B_{\mathrm{RSRA}} = \frac{M_{\mathrm{GPU}} - M_{\mathrm{params}}}{S \cdot M_{\mathrm{KV}}(1)}$$
 >
@@ -404,7 +404,7 @@ For $N = 10$ reasoning steps, RSRA uses $10\times$ less KV-cache memory. For $N 
 >
 > $$B_{\mathrm{CoT}} = \frac{M_{\mathrm{GPU}} - M_{\mathrm{params}}}{(S + N) \cdot M_{\mathrm{KV}}(1)}$$
 >
-> *where $S$ is the sequence length. The throughput improvement factor is $(S + N) / S$, which can be substantial for long reasoning chains ($N \gg S$).*
+> where $S$ is the sequence length. The throughput improvement factor is $(S + N) / S$, which can be substantial for long reasoning chains ($N \gg S$).
 
 ### Remark 4.1 (Memory During Training)
 

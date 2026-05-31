@@ -224,7 +224,7 @@ RSRA-4B replaces PonderNet's uninformative halting signal with a *semantically r
 
 ### 6. Denoising Recursion Models (DRM)
 
-**Reference:** 2026 (preprint). *Denoising Recursion Models.*
+**Reference:** 2026 (preprint). Denoising Recursion Models.
 
 **Description.** DRMs apply the diffusion model paradigm to recursive computation in transformers. Starting from a "noisy" or corrupted initial representation, the model iteratively denoises toward a clean output — analogous to how diffusion models generate images by gradually removing noise. The denoising objective provides a natural training signal for the iterative process.
 
@@ -254,7 +254,7 @@ RSRA-4B replaces PonderNet's uninformative halting signal with a *semantically r
 
 ### 7. Dynamic Self-Verify Decoding (DSVD)
 
-**Reference:** 2024–2025. *Dynamic Self-Verify Decoding.*
+**Reference:** 2024–2025. Dynamic Self-Verify Decoding.
 
 **Description.** DSVD attaches lightweight probing heads to the hidden layers of a frozen (pre-trained) transformer. During inference, these heads monitor the internal representations for anomalies — low confidence, inconsistency with prior states, or deviation from expected patterns. When an anomaly is detected, the decoder backtracks (discards recent tokens) and re-samples with modified temperature or top-k parameters.
 

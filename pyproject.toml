@@ -7,10 +7,11 @@ name = "rsra-4b"
 version = "0.1.0"
 description = "Recursive Self-Reflective Architecture (RSRA-4B): Implementation and evaluation of self-reflective reasoning loops in neural networks"
 readme = "README.md"
-license = {text = "Apache-2.0"}
+license = {text = "CC-BY-NC-SA-4.0"}
 requires-python = ">=3.10"
 authors = [
-    {name = "RSRA-4B Team"},
+    {name = "Dr-Ing. M. Essayed Bouzouraa", email = "research@4qdr.ai"},
+    {name = "4QDR.AI Labs"},
 ]
 keywords = [
     "deep-learning",
@@ -23,7 +24,7 @@ keywords = [
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: Apache Software License",
+    "License :: Free For Non-Commercial Use",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",

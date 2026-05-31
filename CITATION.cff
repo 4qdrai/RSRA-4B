@@ -3,7 +3,13 @@ title: "RSRA-4B: Recursive Self-Reflective Architecture"
 message: "If you use this software, please cite it as below."
 type: software
 authors:
-  - name: "RSRA-4B Research Team"
+  - family-names: "Bouzouraa"
+    given-names: "Essayed"
+    title: "Dr-Ing."
+    affiliation: "4QDR.AI Labs"
+    email: "research@4qdr.ai"
+  - name: "4QDR.AI Research Team"
+    affiliation: "4QDR.AI Labs"
 version: 0.1.0
 date-released: 2026-05-31
 url: "https://github.com/4qdrai/RSRA-4B"
@@ -14,4 +20,4 @@ keywords:
   - Banach contraction
   - autonomous systems
   - formal verification
-license: MPL-2.0
+license: CC-BY-NC-SA-4.0

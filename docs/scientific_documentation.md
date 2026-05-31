@@ -274,13 +274,13 @@ We establish four foundational theorems that underpin the correctness and effici
 
 > **Theorem 1 (Banach Contraction Convergence).** *Let $R_l : \mathbb{R}^d \to \mathbb{R}^d$ be the refinement operator at tier $l$ of RSRA-4B, parameterized as $R_l(h) = (1 - \rho) \cdot h + \rho \cdot g_l(h, \mathrm{ctx})$ where $g_l$ is a neural network whose weight matrices are spectrally normalized so that $g_l$ has Lipschitz constant $L_g \leq 1$, and $\rho \in (0, 1)$ is the contraction factor. Then:*
 >
-> *(i) $R_l$ is a contraction with rate $c = 1 - \rho + \rho L_g < 1$ (since $L_g < 1$ in practice due to the contractive effect of GELU activations, and $c \leq 1$ in the worst-case boundary where $L_g \leq 1$).*
+> - **(i)** $R_l$ is a contraction with rate $c = 1 - \rho + \rho L_g < 1$ (since $L_g < 1$ in practice due to the contractive effect of GELU activations, and $c \leq 1$ in the worst-case boundary where $L_g \leq 1$).
 >
-> *(ii) There exists a unique fixed point $h^*$ such that $R_l(h^*) = h^*$.*
+> - **(ii)** There exists a unique fixed point $h^*$ such that $R_l(h^*) = h^*$.
 >
-> *(iii) For any initial state $h_0$, the sequence $h_{k+1} = R_l(h_k)$ satisfies $\|h_k - h^*\| \leq c^k \|h_0 - h^*\|$.*
+> - **(iii)** For any initial state $h_0$, the sequence $h_{k+1} = R_l(h_k)$ satisfies $\|h_k - h^*\| \leq c^k \|h_0 - h^*\|$.
 >
-> *(iv) Convergence to $\varepsilon$-accuracy requires at most $\lceil \log(1/\varepsilon) / \log(1/c) \rceil$ iterations.*
+> - **(iv)** Convergence to $\varepsilon$-accuracy requires at most $\lceil \log(1/\varepsilon) / \log(1/c) \rceil$ iterations.
 
 **Proof sketch.** $(\mathbb{R}^d, \|\cdot\|)$ is a complete metric space. The spectrally normalized weights ensure $\|g_l(x) - g_l(y)\| \leq L_g \|x - y\|$ with $L_g \leq 1$. By the triangle inequality, $\|R_l(x) - R_l(y)\| \leq (1-\rho + \rho L_g)\|x-y\| = c\|x-y\|$ where $c < 1$. The Banach fixed-point theorem guarantees existence and uniqueness of $h^*$. Geometric convergence follows directly from iterating the contraction inequality.
 
@@ -295,7 +295,7 @@ We establish four foundational theorems that underpin the correctness and effici
 >
 > $$h_{k+1} = (1 - \beta) h_k + \beta \, R_l(h_k), \quad \beta \in (0, 1)$$
 >
-> *converges to a fixed point $h^*$ at a linear rate.*
+> converges to a fixed point $h^*$ at a linear rate.
 
 **Proof sketch.** The monotone parameterization ensures $\langle R_l(h_1) - R_l(h_2), h_1 - h_2 \rangle \geq 0$ for all $h_1, h_2$. The forward–backward splitting operator $(I + R_l)^{-1}$ is firmly nonexpansive, and the Krasnoselskii–Mann iteration on firmly nonexpansive operators converges (Bauschke & Combettes, 2017).
 
@@ -307,7 +307,7 @@ We establish four foundational theorems that underpin the correctness and effici
 >
 > $$\text{FLOPs}_{\text{total}}(t) \leq \sum_{l=1}^{4} K_{\max} \cdot C_{\text{block}}(l) = O(K_{\max} \cdot C_{\text{block}})$$
 >
-> *where $C_{\text{block}}(l)$ is the per-iteration compute cost at tier $l$.*
+> where $C_{\text{block}}(l)$ is the per-iteration compute cost at tier $l$.
 
 **Proof sketch.** Each tier processes at most $K_{\max}$ iterations (hard cap). The differentiable FLOPs penalty proxy $\Omega_{\text{flops}} = 1.0 - \text{mean}(v)$ ensures that the model is trained to minimize unnecessary computation by maximizing checker confidence early. At inference time, token-level early exit terminates as soon as $v \geq \tau$, ensuring that the average iteration count is much less than $K_{\max}$.
 
@@ -317,7 +317,7 @@ We establish four foundational theorems that underpin the correctness and effici
 >
 > $$M_{\text{KV}}(N) = M_{\text{KV}}(1) = O(d_{\text{model}} \cdot n_{\text{layers}})$$
 >
-> *That is, KV-cache memory is $O(1)$ with respect to the number of recursive reasoning steps $N$.*
+> That is, KV-cache memory is $O(1)$ with respect to the number of recursive reasoning steps $N$.
 
 **Proof sketch.** Recursive refinement operates on a single $d$-dimensional hidden state vector per position, without generating intermediate tokens. The refinement iterations $h^{(1)}, h^{(2)}, \ldots, h^{(K)}$ overwrite the same hidden state slot; only the final converged state $h^{(K)}$ is passed to the attention mechanism and stored in the KV-cache. Therefore, $K$ recursive iterations consume the same KV-cache memory as $1$ iteration. In contrast, chain-of-thought reasoning generates $K$ additional tokens, each requiring a KV-cache entry, yielding $O(K)$ memory scaling.
 
