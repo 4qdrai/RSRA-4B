@@ -10,7 +10,7 @@ readme = "README.md"
 license = {text = "CC-BY-NC-SA-4.0"}
 requires-python = ">=3.10"
 authors = [
-    {name = "Dr-Ing. M. Essayed Bouzouraa", email = "research@4qdr.ai"},
+    {name = "Dr-Ing. M. Essayed Bouzouraa", email = "4qdr.ai@gmail.com"},
     {name = "4QDR.AI Labs"},
 ]
 keywords = [

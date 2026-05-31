@@ -383,7 +383,7 @@ def build_html():
     
     <div class="footnotes">
       <div class="footnotes-divider"></div>
-      <p><sup>1</sup> Correspondence to: <span style="font-family: monospace;">research@4qdr.ai</span>. Dr-Ing. M. Essayed Bouzouraa is the corresponding author.</p>
+      <p><sup>1</sup> Correspondence to: <span style="font-family: monospace;">4qdr.ai@gmail.com</span>. Dr-Ing. M. Essayed Bouzouraa is the corresponding author.</p>
       <p><sup>2</sup> Code base and simulation logs are open-sourced under Apache 2.0 at: <a href="https://github.com/4qdrai/RSRA-4B" style="color: blue; text-decoration: none;">github.com/4qdrai/RSRA-4B</a></p>
     </div>
   </div>
