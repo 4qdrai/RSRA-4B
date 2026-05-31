@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "rsra-4b"
 version = "0.1.0"
-description = "Recursive Self-Reflective Architecture (RSRA-4B): Evidence Repository for the SPRIND Next Frontier AI Challenge"
+description = "Recursive Self-Reflective Architecture (RSRA-4B): Implementation and evaluation of self-reflective reasoning loops in neural networks"
 readme = "README.md"
 license = {text = "Apache-2.0"}
 requires-python = ">=3.10"
